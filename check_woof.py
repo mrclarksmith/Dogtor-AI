@@ -82,9 +82,9 @@ def extract_features_mel(file_name, wav = False, sr=22050):
     except Exception as e:
         print("Error encountered while parsing file: ",e)
         return None 
-
+frame_length = 176
 def pad_data(data):
-    frame_length = 176
+
     print(data.shape)
     if data.shape[1] <frame_length:
         data = np.pad(data,((0,0),(0,frame_length-data.shape[1])),'constant',constant_values = (0))

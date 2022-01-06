@@ -14,15 +14,32 @@ import sounddevice as sd
 from check_woof import predict
 #Some Utils
 import os
+import random
+from threading import Thread
 
-import time
-from soundplayer import SoundPlayer
-
-
+import playsound
+playback= True # playback dog barking sounds
 plot_show = True
+sleep_time = 5 #seconds
 
 if plot_show ==  True:
     from matplotlib.animation import FuncAnimation
+
+audio_dir = './audio_files/'
+
+
+
+def stop_docker():
+    subprocess.Popen('docker stop tensor')
+    
+    
+def play_woof():
+    audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")] )
+    print(audio_file)
+    playsound.playsound(audio_dir+audio_file) 
+
+
+    
     
 #start tensorflow server
 def start_tf_server():
@@ -37,7 +54,7 @@ def start_tf_server():
     #                                                   ports={'8080/tcp': docker_config.PYWREN_SERVER_PORT})'tensorflow/serving', command= doc_create, detach=True)
     
 
-    cmd = 'docker run --name tensor --rm -p 8501:8501 --mount type=bind,source=D:\python2\woof_friend\Dogtor_AI\Doctor-AI\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'    
+    cmd = 'docker run --name tensor --rm -p 8501:8501 --mount type=bind,source=D:\python2\woof_friend\Dogtor-AI\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'    
     subprocess.Popen(cmd)
     # os.system(cmd)
 
@@ -137,7 +154,7 @@ FORMAT =  np.float32
 #     raise CustomException('this is my custom message')
 WIDTH =  2
 n_windows =  int(1/SLIDING_WINDOW)     
-# RATE =  44100   
+RATE =  22050   
 CHUNKSIZE = int(RATE*.60) #.60 of a second (.1sec overlap)
 
 def variance(data):
@@ -187,9 +204,9 @@ n_times =  0
 save_name = 0 
 CHANNELS = 1 
 
-
-
-          
+buff = np.array([])
+indata_1 = 0
+audio_buffer = 0          
 
 q = queue.Queue()
 if plot_show ==  True:
@@ -209,23 +226,35 @@ def callback(indata, frames, time, status,woof= 0,):
     # print(aduio_buffer, print(np.squeeze(indata)))
     # audio_buffer =indata
     # print(CHUNKSIZE)
-    
+    global buff 
+    global indata_1    
     if status:
+    
         print(status)
     if any(indata):
-        
-        if len(q.queue) == 0:
-            
-            q.put(np.squeeze(indata))
+        print(frames)
+        if all(buff) == None:
+            buff = np.squeeze(indata)
+            # q.put(np.squeeze(indata))
         
             print("init_concat")
             
         else:
+            # print(len(q.queue), "quee")
             #trim oldest audio fromt the front using CHUNKSIZE and add the newest cunk
             #to the end.
             # print("go time")
-            audio_buffer = np.concatenate(( q.get()[int(frames*.75):] ,np.squeeze(indata)))
-            q.put(np.squeeze(indata))
+            
+            # print(len(q.queue), "quee2")
+            # audio_buffer = np.concatenate(( q.get()[int(frames*.5):] ,np.squeeze(indata)))
+
+            # indata_1 = indata
+            # buff  = q.get()
+            buff= np.concatenate((buff[-int(frames*.25):] ,np.squeeze(indata)))
+            # audio_buffer = np.concatenate(( buff[int(frames*.5):] ,np.squeeze(indata)))
+            # print(len(q.queue), "quee2.2")
+            # q.put(np.squeeze(indata))
+            # print(len(q.queue), "quee3")
             # audio_buffer =  np.concatenate((audio_buffer, indata))
             # print(len(audio_buffer))
         
@@ -235,10 +264,11 @@ def callback(indata, frames, time, status,woof= 0,):
                 # global data
                 #detect woof from check_woof.py
                 # print(audio_buffer[np.newaxis,:].shape)
-                audio_buffer =  audio_buffer[np.newaxis,:]
-                global data
-                woof, array, data = predict(audio_buffer, confidence = .85, wording = True)
                 
+                audio_buffer =  buff[np.newaxis,:]
+                print("length audio buffer", audio_buffer.shape)
+                global data
+                woof, array, data = predict(audio_buffer, confidence = .90, wording = True)
                 
                 
                 if plot_show ==  True:
@@ -247,12 +277,17 @@ def callback(indata, frames, time, status,woof= 0,):
                     
             if woof == 1:
                 print("woof woof a dog was heard")
+                count+=1
+                print(count)
+                if (count == 5) & (playback == True):
+                    music_thread = Thread(target=play_woof)
+                    music_thread.start()
+                    count = 0
+                    print(f'sleeping for {sleep_time} seconds')
+                    sd.sleep(int(sleep_time*1000))
                 
-                if count == 5:
-                    count+=1
-                    print(count)
                     
-                    audio_file = SoundPlayer("/home/pi/sound/salza1.wav", 1) 
+
                     
                     
                     
@@ -294,7 +329,7 @@ try:
     if plot_show == True:
         plotdata = []
         fig = plt.figure()
-        
+        #initialize plot
         plotdata.append(np.random.rand(40,87))
         im =plt.imshow(plotdata[0], animated = True)
         fig.tight_layout(pad=0)
@@ -303,12 +338,12 @@ try:
                         channels =  1,
                         samplerate = RATE,
                         callback=callback,
-                        blocksize=int(RATE*1),
+                        blocksize=int(RATE*2),
                         #blocksize=int(RATE * BUFFER_SECONDS),
                         )
     
     if plot_show == True:
-        ani = FuncAnimation(fig, update_plot, interval=1 , blit=False)
+        ani = FuncAnimation(fig, update_plot, interval=2 , blit=False)
     with stream:
 
         while True:
@@ -318,6 +353,7 @@ try:
             
             response = input()
             if response in ('', 'q', 'Q'):
+                stop_docker()
                 break
             # for ch in response:
             #     if ch == '+':
@@ -331,7 +367,7 @@ try:
         
         
         
-    subprocess.Popen('docker stop tensor')        
+        
 except Exception as e:
     subprocess.Popen('docker stop tensor')  
     print("end",  e)
