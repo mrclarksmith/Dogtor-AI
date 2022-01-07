@@ -19,7 +19,7 @@ from threading import Thread
 
 import playsound
 playback= True # playback dog barking sounds
-plot_show = True
+plot_show = False
 sleep_time = 5 #seconds
 
 if plot_show ==  True:
@@ -34,6 +34,7 @@ def stop_docker():
     
     
 def play_woof():
+    #TODO change to sd.play() remove thread?
     audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")] )
     print(audio_file)
     playsound.playsound(audio_dir+audio_file) 
@@ -54,7 +55,7 @@ def start_tf_server():
     #                                                   ports={'8080/tcp': docker_config.PYWREN_SERVER_PORT})'tensorflow/serving', command= doc_create, detach=True)
     
 
-    cmd = 'docker run --name tensor --rm -p 8501:8501 --mount type=bind,source=D:\python2\woof_friend\Dogtor-AI\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'    
+    cmd = 'docker run --name tensor --rm -p 8501:8501 --mount type=bind,source=.\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'    
     subprocess.Popen(cmd)
     # os.system(cmd)
 
@@ -124,9 +125,9 @@ def minMaxNormalize(arr):
 
 
 def mic_index(): #get blue yetti mic index
-    count = sd.query_devices()
+    devices = sd.query_devices()
     print('index of available devices')
-    for i, item in enumerate(count):
+    for i, item in enumerate(devices):
         try:
 
 
@@ -138,12 +139,16 @@ def mic_index(): #get blue yetti mic index
         except:
             pass
     
+    
+#start docker server with tf    
 try:
     start_tf_server()
 except Exception as e:
     print(e)
 # time.sleep(5)
-
+devices = sd.query_devices()
+print(devices)
+mic_number = input("Enter mic number to use: ")
 
 dev_mic, RATE =  mic_index()
 
@@ -334,7 +339,7 @@ try:
         im =plt.imshow(plotdata[0], animated = True)
         fig.tight_layout(pad=0)
     
-    stream =  sd.InputStream(device = dev_mic,
+    stream =  sd.InputStream(device = int(mic_number),
                         channels =  1,
                         samplerate = RATE,
                         callback=callback,
