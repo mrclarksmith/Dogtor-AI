@@ -38,7 +38,7 @@ def start_tf_server():
     #                                                   ports={'8080/tcp': docker_config.PYWREN_SERVER_PORT})'tensorflow/serving', command= doc_create, detach=True)
 
     #raspbery could need to run -v vs -mount
-    cmd = 'docker run --name tensor --rm -p 8501:8501 --mount type=bind,source=.\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'    
+    cmd = 'sudo docker run --name tensor --rm -p 8501:8501 -v type=bind,source=.\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'    
     subprocess.Popen(cmd)
 
 def mic_index(): #get blue yetti mic index
