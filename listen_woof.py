@@ -13,8 +13,18 @@ import numpy as np
 import sounddevice as sd
 import playsound
 
-from check_woof import predict #import predict from same folder
 
+import tensorflow as tf
+from tensorflow_addons.optimizers import RectifiedAdam
+tf.keras.optimizers.RectifiedAdam = RectifiedAdam
+def run_tensor():
+    model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
+    model = tf.keras.models.load_model(model_path)
+    return model
+
+
+# from check_woof import import_model#import predict from same folder
+from check_woof import predict
 def stop_docker():
     subprocess.Popen('docker stop tensor')
     
@@ -111,7 +121,8 @@ def update_plot(frame):
 def callback(indata, frames, time, status, woof= 0):
     global woof_count 
     global buff   
-    
+    global audio_buffer
+    # global model
     if status:
         print(status)
         
@@ -128,7 +139,7 @@ def callback(indata, frames, time, status, woof= 0):
                 audio_buffer =  buff[np.newaxis,:]
                 print("length audio buffer", audio_buffer.shape)
                 global data
-                woof, array, data = predict(audio_buffer, confidence = CONFIDENCE, wording = True)
+                woof, array, data = predict(audio_buffer,model, confidence=.93, wording = True)
 
                 if plot_show ==  True:
                     p.put(data)                   
@@ -159,6 +170,7 @@ def callback(indata, frames, time, status, woof= 0):
 #####################################################################################
 #Setting Initiation 
 playback= True # playback dog barking sounds
+DOCKER = False # docker tensorflow server does not work on arm65
 plot_show = False #shows plot for every sound that activates prediction function aka a loud sound
 sleep_time = 5 #seconds after the computer barks back, we sleep
 BUFFER_SECONDS = 1 #Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the dge
@@ -172,23 +184,28 @@ buff = np.array([])  #Saves as global data buffer for predicting. If the bark ha
 audio_buffer = 0    #creates an array from buffer #TODO can be combined with buff variable        
 woof_count = 0 #initialize count for dog barks
 
-#start docker server with tf    
-try:
-    start_tf_server()
-except Exception as e:
-    print(e)
+#start docker server with tf    otherwise uses tensorflow light
 
+if DOCKER == True:
+    try:
+        start_tf_server()
+    except Exception as e:
+        print(e)
+
+
+# dev_mic, RATE =  mic_index()
 #Detect Loudness minimum level. When loudness exceeds threshold detection for dog barks is triggered
-loud_threshold =  loudness()
+
 
 #Set Recording Device
 devices = sd.query_devices()
 print(devices)
-mic_number = input("Enter mic number to use: ")
-dev_mic, RATE =  mic_index() #Rate of the microphone is overwritten later
+dev_mic = int(input("Enter mic number to use: "))
+
+ #Rate of the microphone is overwritten later
 RATE =  22050   # samnples per second : Setting custom rate to 22050 instead of 44100 to save on computational time
-
-
+loud_threshold =  loudness()
+# model = import_model()
 #Loop Start #################################################################################################
 try:
     if plot_show == True:
@@ -201,8 +218,10 @@ try:
         plotdata.append(np.random.rand(40,87)) # set initial value for the plot to get a frame size etc. This locks the plot in place for future
         im =plt.imshow(plotdata[0], animated = True)
         fig.tight_layout(pad=0)
+    print("loading model")
+    model = run_tensor()
     
-    stream =  sd.InputStream(device = int(mic_number),
+    stream =  sd.InputStream(device = int(dev_mic),
                         channels =  1,
                         samplerate = RATE,
                         callback=callback,
@@ -238,14 +257,16 @@ except Exception as e:
     
     
     
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
 #utilities Not used
 # def float2pcm(sig, dtype='int16'):
 #     """Convert floating point signal with a range from -1 to 1 to PCM.

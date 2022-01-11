@@ -10,9 +10,13 @@ import json
 import librosa
 import numpy as np
 # sound = './one_woof.wav'
-# import tensorflow as tf
+
 # from tensorflow.keras.models import Model
- 
+# import tflite_runtime.interpreter as tflite
+# import tensorflow as tf
+# from tensorflow_addons.optimizers import RectifiedAdam
+# tf.keras.optimizers.RectifiedAdam = RectifiedAdam
+
 SR = 22050
 N_FFT = 1024        
 HOP_SIZE = 1024       
@@ -23,9 +27,15 @@ FEATURE = 'mel'
 FMIN = 20 #minimum frequency
 FMAX = 4000
 HOP_LENGTH = N_FFT//2
-import tensorflow as tf
 
+model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
+tflite_model= r'D:\python2\woof_friendwoof_friend25.tflite'
+# model_path ='D:/python2/woof_friend/c_f_model.h5',
 
+# import tensorflow as tf
+# model2 = tf.saved_model.load(model_path, compile=False)
+# model = tf.keras.models.load_model(model_path, compile=False)
+# interpreter = tflite.Interpreter(model_path=model_path)
 def normalize(x, a=0, b= 1):
     y = ( (b-a)*( x- x.min()) / ( x.max() - x.min() ) ) +(a)
     return y
@@ -34,17 +44,16 @@ def power_to_db(S):
     S_DB = librosa.power_to_db(S, ref=np.max)
     return S_DB
 
-
-
-
-
-
-
-
-
+def run_lite_model(X):
+    interpreter = tf.lite.Interpreter(tflite_model)
+    interpreter.allocate_tensors()
+    
+    
+def run_tensor(X):
+    model = tf.keras.models.load_model(model_path)
+    return model.predict(X)
 
 def extract_features(file_name, wav = False, sr=44100, n_mfcc=40):
-
     try:
         if wav  == True:
             file_name, sample_rate = librosa.load(file_name, res_type='kaiser_fast', sr = 44100, mono =True)
@@ -82,10 +91,16 @@ def extract_features_mel(file_name, wav = False, sr=22050):
     except Exception as e:
         print("Error encountered while parsing file: ",e)
         return None 
+    
+    
 frame_length = 176
 def pad_data(data):
 
     print(data.shape)
+    #pad data before and after for better algorithm detection
+    if data.shape[1] <(frame_length-20):
+        data = np.pad(data,((0,0),(20,frame_length-data.shape[1]-20)),'constant',constant_values = (0))
+        
     if data.shape[1] <frame_length:
         data = np.pad(data,((0,0),(0,frame_length-data.shape[1])),'constant',constant_values = (0))
     elif data.shape[1] >frame_length:
@@ -93,10 +108,6 @@ def pad_data(data):
     return data
 
 
-def load_model():
-    
-    model = tf.keras.models.load_model('./checkpointwoof_ML.h5')
-    return model
 
 def make_prediction(instances):
    url = 'http://localhost:8501/v1/models/woof_detector:predict'
@@ -106,14 +117,14 @@ def make_prediction(instances):
    predictions = json.loads(json_response.text)['predictions']
    return predictions
 
-def predict(audio_m, confidence, wav = False, sr=44100, wording = False):
+
+
+def predict(audio_buffer, model, confidence=.93, wav = False, sr=22050, wording = False):
+    #audio_buffer set up to analize multiple frames at the same time by passing a bach of mels into tensorflow
     mfcc_m = []
 
-    for audio in audio_m:
-        
+    for audio in audio_buffer:
         data = extract_features_mel(audio, wav=wav, sr=sr)
-        
-
         data = power_to_db(data)
         data = normalize(data)
         data_padded = pad_data(data)
@@ -122,19 +133,18 @@ def predict(audio_m, confidence, wav = False, sr=44100, wording = False):
     data_padded_m = np.array(mfcc_m)
        
     X = data_padded_m[..., np.newaxis]
-    # X = np.expand_dims(X,0)
-    
-    # model =  load_model()
+    # print(confidence)
     print(X.shape)
     try:
-        predictions  = make_prediction(X)
-        # print(predictions)
+        predictions = model.predict(X)
     except Exception as e:
-        print(e)    
+        print(e)
+        #prediction = [[0]] #capture any big exception during rollout #do not activate until final version
+        
+    print(predictions)
+    #predictions  = make_prediction(X)
+   
  
-    # predictions = model.predict(X)
-
-    # queue = mp.Queue()
 
     prediction = predictions[0][0]
 
