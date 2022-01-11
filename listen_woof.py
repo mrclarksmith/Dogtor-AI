@@ -175,7 +175,7 @@ def callback(indata, frames, time, status, woof= 0):
 #Setting Initiation 
 playback= True # playback dog barking sounds
 DOCKER = False # docker tensorflow server does not work on arm65
-plot_show = True #shows plot for every sound that activates prediction function aka a loud sound
+plot_show = False #shows plot for every sound that activates prediction function aka a loud sound
 sleep_time = 5 #seconds after the computer barks back, we sleep
 BUFFER_SECONDS = 1 #Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the dge
 BUFFER_ADD =.15 #Seconds to add to the buffer from previous buffer for prediction
