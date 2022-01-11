@@ -15,12 +15,16 @@ import playsound
 
 
 import tensorflow as tf
-from tensorflow_addons.optimizers import RectifiedAdam
-tf.keras.optimizers.RectifiedAdam = RectifiedAdam
+# from tensorflow_addons.optimizers import RectifiedAdam
+# tf.keras.optimizers.RectifiedAdam = RectifiedAdam
 def run_tensor():
-    model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
-    model = tf.keras.models.load_model(model_path)
-    return model
+    # model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
+    # model = tf.keras.models.load_model(model_path)
+    tflite_model= r'D:\python2\woof_friend\woof_friend_final.tflite'
+    interpreter = tf.lite.Interpreter(tflite_model)
+    interpreter.allocate_tensors()
+        
+    return interpreter
 
 
 # from check_woof import import_model#import predict from same folder
@@ -139,7 +143,7 @@ def callback(indata, frames, time, status, woof= 0):
                 audio_buffer =  buff[np.newaxis,:]
                 print("length audio buffer", audio_buffer.shape)
                 global data
-                woof, array, data = predict(audio_buffer,model, confidence=.93, wording = True)
+                woof, array, data = predict(audio_buffer, interpreter, confidence=.93, wording = True)
 
                 if plot_show ==  True:
                     p.put(data)                   
@@ -171,7 +175,7 @@ def callback(indata, frames, time, status, woof= 0):
 #Setting Initiation 
 playback= True # playback dog barking sounds
 DOCKER = False # docker tensorflow server does not work on arm65
-plot_show = False #shows plot for every sound that activates prediction function aka a loud sound
+plot_show = True #shows plot for every sound that activates prediction function aka a loud sound
 sleep_time = 5 #seconds after the computer barks back, we sleep
 BUFFER_SECONDS = 1 #Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the dge
 BUFFER_ADD =.15 #Seconds to add to the buffer from previous buffer for prediction
@@ -219,7 +223,8 @@ try:
         im =plt.imshow(plotdata[0], animated = True)
         fig.tight_layout(pad=0)
     print("loading model")
-    model = run_tensor()
+    interpreter = run_tensor()
+    
     
     stream =  sd.InputStream(device = int(dev_mic),
                         channels =  1,

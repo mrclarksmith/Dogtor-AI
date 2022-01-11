@@ -9,6 +9,7 @@ import requests
 import json
 import librosa
 import numpy as np
+from sklearn.metrics import accuracy_score
 # sound = './one_woof.wav'
 
 # from tensorflow.keras.models import Model
@@ -29,7 +30,7 @@ FMAX = 4000
 HOP_LENGTH = N_FFT//2
 
 model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
-tflite_model= r'D:\python2\woof_friendwoof_friend25.tflite'
+tflite_model= r'D:\python2\woof_friend\woof_friend3.tflite'
 # model_path ='D:/python2/woof_friend/c_f_model.h5',
 
 # import tensorflow as tf
@@ -44,9 +45,21 @@ def power_to_db(S):
     S_DB = librosa.power_to_db(S, ref=np.max)
     return S_DB
 
-def run_lite_model(X):
-    interpreter = tf.lite.Interpreter(tflite_model)
-    interpreter.allocate_tensors()
+def run_lite_model(X, interpreter):
+
+    # Get input and output tensors.
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    interpreter.set_tensor(input_details[0]['index'], X)
+    # interpreter.set_tensor(input_details[0]['index'], np.array(X_test[:100], dtype = np.float32))
+    # interpreter.resize_tensor_input(input_details[0]['index'], (100,100,176,1))
+    # interpreter.resize_tensor_input(output_details[0]['index'], (100,1))
+    # interpreter.allocate_tensors()
+    interpreter.invoke()
+    output_data = interpreter.get_tensor(output_details[0]['index'])
+    # print(output_data)
+    
+    return output_data
     
     
 def run_tensor(X):
@@ -119,7 +132,7 @@ def make_prediction(instances):
 
 
 
-def predict(audio_buffer, model, confidence=.93, wav = False, sr=22050, wording = False):
+def predict(audio_buffer, interpreter, confidence=.93, wav = False, sr=22050, wording = False):
     #audio_buffer set up to analize multiple frames at the same time by passing a bach of mels into tensorflow
     mfcc_m = []
 
@@ -134,9 +147,11 @@ def predict(audio_buffer, model, confidence=.93, wav = False, sr=22050, wording 
        
     X = data_padded_m[..., np.newaxis]
     # print(confidence)
-    print(X.shape)
+    
+    X = np.array(X, np.float32)
+    
     try:
-        predictions = model.predict(X)
+        predictions = run_lite_model(X, interpreter)
     except Exception as e:
         print(e)
         #prediction = [[0]] #capture any big exception during rollout #do not activate until final version
