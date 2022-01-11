@@ -20,7 +20,7 @@ import tensorflow as tf
 def run_tensor():
     # model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
     # model = tf.keras.models.load_model(model_path)
-    tflite_model= r'D:\python2\woof_friend\woof_friend_final.tflite'
+    tflite_model= r'./models/woof_friend_final.tflite'
     interpreter = tf.lite.Interpreter(tflite_model)
     interpreter.allocate_tensors()
         
