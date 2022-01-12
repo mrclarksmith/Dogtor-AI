@@ -9,7 +9,7 @@ import requests
 import json
 import librosa
 import numpy as np
-from sklearn.metrics import accuracy_score
+#from sklearn.metrics import accuracy_score
 # sound = './one_woof.wav'
 
 # from tensorflow.keras.models import Model
@@ -29,8 +29,8 @@ FMIN = 20 #minimum frequency
 FMAX = 4000
 HOP_LENGTH = N_FFT//2
 
-model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
-tflite_model= r'D:\python2\woof_friend\woof_friend3.tflite'
+#model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
+#tflite_model= r'D:\python2\woof_friend\woof_friend3.tflite'
 # model_path ='D:/python2/woof_friend/c_f_model.h5',
 
 # import tensorflow as tf
@@ -105,7 +105,7 @@ def extract_features_mel(file_name, wav = False, sr=22050):
         print("Error encountered while parsing file: ",e)
         return None 
     
-    
+#Frame length that was coded into the machine learning model cannot change     
 frame_length = 176
 def pad_data(data):
 
@@ -154,7 +154,8 @@ def predict(audio_buffer, interpreter, confidence=.93, wav = False, sr=22050, wo
         predictions = run_lite_model(X, interpreter)
     except Exception as e:
         print(e)
-        #prediction = [[0]] #capture any big exception during rollout #do not activate until final version
+        print('error prediciton is set to zero value 0')
+        prediction = [[0]] #capture any big exception during rollout #do not activate until final version
         
     print(predictions)
     #predictions  = make_prediction(X)

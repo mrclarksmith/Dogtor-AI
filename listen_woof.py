@@ -1,3 +1,4 @@
+#! ~/prog/DogPI/bin/python
 # -*- coding: utf-8 -*-
 """
 Created on Thu Oct 28 18:55:38 2021
@@ -11,8 +12,10 @@ from threading import Thread
 
 import numpy as np
 import sounddevice as sd
+import soundfile as sf
 import playsound
-
+#from pygame import mixer
+from sound_player import SoundPlayer, Sound
 
 import tensorflow as tf
 # from tensorflow_addons.optimizers import RectifiedAdam
@@ -33,11 +36,19 @@ def stop_docker():
     subprocess.Popen('docker stop tensor')
     
     
+#def play_woof():
+#    #TODO change to sd.play() remove thread?
+#    audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")] )
+#    print(audio_file)
+#    playsound.playsound(audio_dir+audio_file) 
+
 def play_woof():
-    #TODO change to sd.play() remove thread?
     audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")] )
-    print(audio_file)
-    playsound.playsound(audio_dir+audio_file) 
+    print(audio_dir+audio_file)
+    player = SoundPlayer()
+    player.enqueue(Sound(audio_dir+audio_file), 1)
+    
+    player.play()  
 
 #start tensorflow server
 def start_tf_server():
@@ -89,6 +100,7 @@ def loudness():
     stream.start()
     n_sample =  stream.read(int(RATE*1))[0] # reads 4 seconds of scilence
     stream.stop()
+    stream.close()
     noise_sample = n_sample
     print("Noise Sample distribution variance")
     # plotAudio2(noise_sample)
@@ -138,10 +150,11 @@ def callback(indata, frames, time, status, woof= 0):
         else:
             buff= np.concatenate((buff[-int(RATE*BUFFER_ADD):] ,np.squeeze(indata)))
             if(np.mean(np.abs(indata))<loud_threshold):
-                print("inside silence reign")   
+                pass
+                #print("inside silence reign")   
             else:
-                audio_buffer =  buff[np.newaxis,:]
-                print("length audio buffer", audio_buffer.shape)
+                audio_buffer = buff[np.newaxis,:]
+                #print("length audio buffer", audio_buffer.shape)
                 global data
                 woof, array, data = predict(audio_buffer, interpreter, confidence=.93, wording = True)
 
@@ -151,12 +164,14 @@ def callback(indata, frames, time, status, woof= 0):
                 print("woof woof a dog was heard")
                 woof_count+=1
                 print(woof_count)
-                if (woof_count == 5) & (playback == True):
-                    music_thread = Thread(target=play_woof)
-                    music_thread.start()
+                if (woof_count == 1) & (playback == True):
+                    #music_thread = Thread(target=play_woof)
+                    #music_thread.start()
+                    play_woof()
                     woof_count = 0 # reset count 
                     print(f'sleeping for {sleep_time} seconds')
                     sd.sleep(int(sleep_time*1000)) # put the sound stream to sleep
+                    #music_thread.join()
                 
                 #save file to desctop to analize
                 # wf = wave.open('./save_audio/Aduio_clip_'+str(save_name)+".wav", 'wb')
@@ -181,7 +196,7 @@ BUFFER_SECONDS = 1 #Each buffer frame is analized by the tensorflow engine for d
 BUFFER_ADD =.15 #Seconds to add to the buffer from previous buffer for prediction
 CHANNELS = 1 #Number of audio channels (left/Right/Mono)
 audio_dir = './audio_files/' #directory where the barking sounds are
-CONFIDENCE = .93 #Confidence of the prediciton model for identifying if the sound contains dog bark
+CONFIDENCE = .88 #Confidence of the prediciton model for identifying if the sound contains dog bark
 #Variable initiation #do not change
 save_name = 0  #used for saving waves files # Not sued currently
 buff = np.array([])  #Saves as global data buffer for predicting. If the bark happends at the end or beggining we ened to createa a window overlap
@@ -224,8 +239,8 @@ try:
         fig.tight_layout(pad=0)
     print("loading model")
     interpreter = run_tensor()
-    
-    
+    print("loadinsound input")
+
     stream =  sd.InputStream(device = int(dev_mic),
                         channels =  1,
                         samplerate = RATE,
@@ -257,7 +272,7 @@ try:
             #         break
 
 except Exception as e:
-    subprocess.Popen('docker stop tensor')  
+    #subprocess.Popen('docker stop tensor')  
     print("end",  e)
     
     
