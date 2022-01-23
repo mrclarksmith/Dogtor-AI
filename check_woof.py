@@ -106,7 +106,7 @@ def extract_features_mel(file_name, wav = False, sr=22050):
         return None 
     
 #Frame length that was coded into the machine learning model cannot change     
-frame_length = 176
+frame_length = 97
 def pad_data(data):
 
     print(data.shape)

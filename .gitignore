@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 audio_files/
+ML/data
 build/
 develop-eggs/
 dist/

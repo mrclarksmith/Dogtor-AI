@@ -5,6 +5,7 @@ Created on Thu Oct 28 18:55:38 2021
 @author: Alexsey Gromov
 """
 import os
+import sys
 import random
 import subprocess
 import queue
@@ -13,65 +14,46 @@ from threading import Thread
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
-import playsound
-#from pygame import mixer
-from sound_player import SoundPlayer, Sound
+
+#Darwin = mac os x , win32 = windows
+if sys.platform in "darwin win32":
+    from playsound import playsound
+else:
+    from sound_player import SoundPlayer, Sound
 
 import tensorflow as tf
-# from tensorflow_addons.optimizers import RectifiedAdam
-# tf.keras.optimizers.RectifiedAdam = RectifiedAdam
+# from check_woof import import_model#import predict from same folder
+from check_woof import predict
+
 def run_tensor():
-    # model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
-    # model = tf.keras.models.load_model(model_path)
     tflite_model= r'./models/woof_friend_final.tflite'
     interpreter = tf.lite.Interpreter(tflite_model)
     interpreter.allocate_tensors()
         
     return interpreter
 
+#2 version one for rapsberry one for windows    
+if sys.platform in "darwin win32":  
+    def play_woof():
+        #TODO change to sd.play() remove thread?
+        audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")] )
+        print(audio_file)
+        playsound(audio_dir+audio_file) 
+else:
+    def play_woof():
+        audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")] )
+        print(audio_dir+audio_file)
+        player = SoundPlayer()
+        player.enqueue(Sound(audio_dir+audio_file), 1)    
+        player.play()  
 
-# from check_woof import import_model#import predict from same folder
-from check_woof import predict
-def stop_docker():
-    subprocess.Popen('docker stop tensor')
-    
-    
-#def play_woof():
-#    #TODO change to sd.play() remove thread?
-#    audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")] )
-#    print(audio_file)
-#    playsound.playsound(audio_dir+audio_file) 
 
-def play_woof():
-    audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")] )
-    print(audio_dir+audio_file)
-    player = SoundPlayer()
-    player.enqueue(Sound(audio_dir+audio_file), 1)
-    
-    player.play()  
-
-#start tensorflow server
-def start_tf_server():
-    # client = docker.from_env()
-    # docker.types.Mount()
-    # doc_create = '-t --rm -p 8501:8501 --mount type=bind,source=D:\python2\woof_friend\Dogtor_AI\Doctor-AI\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'
-    # client.containers.run('tensorflow/serving', entrypoint='python',
-    #                                                   command='/tmp/{}/__main__.py'.format(DOCKER_BASE_FOLDER),
-    #                                                   volumes=['{}:/tmp'.format(TEMP)],
-    #                                                   detach=True, auto_remove=True,
-    #                                                   user=uid, name=name,
-    #                                                   ports={'8080/tcp': docker_config.PYWREN_SERVER_PORT})'tensorflow/serving', command= doc_create, detach=True)
-
-    #raspbery could need to run -v vs -mount
-    cmd = 'sudo docker run --name tensor --rm -p 8501:8501 -v type=bind,source=.\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'    
-    subprocess.Popen(cmd)
-
-def mic_index(): #get blue yetti mic index
+def mic_index(dev_name  ='yeti'): #get blue yetti mic index
     devices = sd.query_devices()
     print('index of available devices')
     for i, item in enumerate(devices):
         try:
-            if ("yeti" in item['name'].lower() )and ("micro" in item['name'].lower()):
+            if (dev_name in item['name'].lower() )and ("micro" in item['name'].lower()):
                 print(i,":", item['name'], "Default SR: ",item['default_samplerate'])
                 sr = int(item['default_samplerate'])
                 return i, sr
@@ -203,13 +185,7 @@ buff = np.array([])  #Saves as global data buffer for predicting. If the bark ha
 audio_buffer = 0    #creates an array from buffer #TODO can be combined with buff variable        
 woof_count = 0 #initialize count for dog barks
 
-#start docker server with tf    otherwise uses tensorflow light
 
-if DOCKER == True:
-    try:
-        start_tf_server()
-    except Exception as e:
-        print(e)
 
 
 # dev_mic, RATE =  mic_index()
@@ -350,3 +326,13 @@ except Exception as e:
 #     return (arr-mn)/(mx-mn)
 
 
+# #start docker server with tf  otherwise uses tensorflow light
+# if DOCKER == True:
+#     try:
+#         start_tf_server()
+#     except Exception as e:
+#         print(e)
+# #start tensorflow server # not used
+# def start_tf_server():
+#     cmd = 'sudo docker run --name tensor --rm -p 8501:8501 -v type=bind,source=.\models\woof_detector,target=/models/woof_detector -e MODEL_NAME=woof_detector  tensorflow/serving'    
+#     subprocess.Popen(cmd)
