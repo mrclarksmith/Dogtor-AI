@@ -15,9 +15,32 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 
+
+#Setting Initiation 
+playback= True # playback dog barking sounds
+DOCKER = False # docker tensorflow server does not work on arm65
+plot_show = True #shows plot for every sound that activates prediction function aka a loud sound
+sleep_time = 5 #seconds after the computer barks back, we sleep
+BUFFER_SECONDS = 1 #Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the dge
+BUFFER_ADD =.15 #Seconds to add to the buffer from previous buffer for prediction
+CHANNELS = 1 #Number of audio channels (left/Right/Mono)
+audio_dir = './audio_files/' #directory where the barking sounds are
+CONFIDENCE = .88 #Confidence of the prediciton model for identifying if the sound contains dog bark
+
+#Variable initiation #do not change
+save_name = 0  #used for saving waves files # Not sued currently
+buff = np.array([])  #Saves as global data buffer for predicting. If the bark happends at the end or beggining we ened to createa a window overlap
+audio_buffer = 0    #creates an array from buffer #TODO can be combined with buff variable        
+woof_count = 0 #initialize count for dog barks
+
+
+
+
+
 #Darwin = mac os x , win32 = windows
 if sys.platform in "darwin win32":
     from playsound import playsound
+    print("Playsound  will be use because this is MAC OR PC")
 else:
     from sound_player import SoundPlayer, Sound
 
@@ -147,13 +170,13 @@ def callback(indata, frames, time, status, woof= 0):
                 woof_count+=1
                 print(woof_count)
                 if (woof_count == 1) & (playback == True):
-                    #music_thread = Thread(target=play_woof)
-                    #music_thread.start()
-                    play_woof()
+                    music_thread = Thread(target=play_woof)
+                    music_thread.start()
+                    #play_woof()
                     woof_count = 0 # reset count 
                     print(f'sleeping for {sleep_time} seconds')
                     sd.sleep(int(sleep_time*1000)) # put the sound stream to sleep
-                    #music_thread.join()
+                    music_thread.join()
                 
                 #save file to desctop to analize
                 # wf = wave.open('./save_audio/Aduio_clip_'+str(save_name)+".wav", 'wb')
@@ -169,22 +192,6 @@ def callback(indata, frames, time, status, woof= 0):
 
 
 #####################################################################################
-#Setting Initiation 
-playback= True # playback dog barking sounds
-DOCKER = False # docker tensorflow server does not work on arm65
-plot_show = False #shows plot for every sound that activates prediction function aka a loud sound
-sleep_time = 5 #seconds after the computer barks back, we sleep
-BUFFER_SECONDS = 1 #Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the dge
-BUFFER_ADD =.15 #Seconds to add to the buffer from previous buffer for prediction
-CHANNELS = 1 #Number of audio channels (left/Right/Mono)
-audio_dir = './audio_files/' #directory where the barking sounds are
-CONFIDENCE = .88 #Confidence of the prediciton model for identifying if the sound contains dog bark
-#Variable initiation #do not change
-save_name = 0  #used for saving waves files # Not sued currently
-buff = np.array([])  #Saves as global data buffer for predicting. If the bark happends at the end or beggining we ened to createa a window overlap
-audio_buffer = 0    #creates an array from buffer #TODO can be combined with buff variable        
-woof_count = 0 #initialize count for dog barks
-
 
 
 

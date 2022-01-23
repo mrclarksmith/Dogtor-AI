@@ -28,7 +28,7 @@ FEATURE = 'mel'
 FMIN = 20 #minimum frequency
 FMAX = 4000
 HOP_LENGTH = N_FFT//2
-
+frame_length = 97
 #model_path = r'D:\python2\woof_friend\models\woof_detector\1641850981'
 #tflite_model= r'D:\python2\woof_friend\woof_friend3.tflite'
 # model_path ='D:/python2/woof_friend/c_f_model.h5',
@@ -62,9 +62,9 @@ def run_lite_model(X, interpreter):
     return output_data
     
     
-def run_tensor(X):
-    model = tf.keras.models.load_model(model_path)
-    return model.predict(X)
+# def run_tensor(X):
+#     model = tf.keras.models.load_model(model_path)
+#     return model.predict(X)
 
 def extract_features(file_name, wav = False, sr=44100, n_mfcc=40):
     try:
@@ -106,7 +106,7 @@ def extract_features_mel(file_name, wav = False, sr=22050):
         return None 
     
 #Frame length that was coded into the machine learning model cannot change     
-frame_length = 97
+
 def pad_data(data):
 
     print(data.shape)
@@ -122,13 +122,13 @@ def pad_data(data):
 
 
 
-def make_prediction(instances):
-   url = 'http://localhost:8501/v1/models/woof_detector:predict'
-   data = json.dumps({"signature_name": "serving_default", "instances": instances.tolist()})
-   headers = {"content-type": "application/json"}
-   json_response = requests.post(url, data=data, headers=headers)
-   predictions = json.loads(json_response.text)['predictions']
-   return predictions
+# def make_prediction(instances):
+#    url = 'http://localhost:8501/v1/models/woof_detector:predict'
+#    data = json.dumps({"signature_name": "serving_default", "instances": instances.tolist()})
+#    headers = {"content-type": "application/json"}
+#    json_response = requests.post(url, data=data, headers=headers)
+#    predictions = json.loads(json_response.text)['predictions']
+#    return predictions
 
 
 
@@ -159,9 +159,6 @@ def predict(audio_buffer, interpreter, confidence=.93, wav = False, sr=22050, wo
         
     print(predictions)
     #predictions  = make_prediction(X)
-   
- 
-
     prediction = predictions[0][0]
 
     if wording == True:
