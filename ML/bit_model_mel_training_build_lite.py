@@ -23,7 +23,6 @@ from tensorflow.keras.utils import to_categorical
 import tensorflow_hub as hub
 import tensorflow_addons as tfa
 
-
 def normalize(x, a=0, b= 1):
     y = ( (b-a)*( x- x.min()) / ( x.max() - x.min() ) ) +(a)
     return y
@@ -31,9 +30,7 @@ def plot_mel(S):
     if len(X_train[1].shape) == 3:
         S= np.squeeze(S)
     sr = 22050
-    N_FFT = 512 
     # WIN_LENGTH = N_FFT
-    HOP_LENGTH = N_FFT//1
     # S_DB = librosa.power_to_db(S, ref=np.max)
     librosa.display.specshow(S, sr=sr,  x_axis='time', y_axis='mel');
     plt.colorbar(format='%+1.0f dB');    
@@ -58,16 +55,22 @@ latenet_dim = frame_length
 model_path = os.path.join("D:/python2/woof_friend/bit_m-r101x1_1")
 pickle_path = "D:/python2/woof_friend/pickle_list_MEL_100_NFTT_512"
 pickle_path2 = "D:/python2/woof_friend/pickle_list_Newlin_Dog_barks"
+pickle_path3 =  "D:\python2\woof_friend\Dogtor-AI\ML\data\PetDogSoundEvent_Barking"
 module = hub.KerasLayer(model_path)
 # module = tf.saved_model.load(model_path)
 def initialize(frame_length = frame_length ):
     with open(pickle_path, "rb") as f:
         mfcc_list = pickle.load(f)
     with open(pickle_path2, "rb") as f:
-        mfcc_list2 = (pickle.load(f))        
+        mfcc_list2 = (pickle.load(f))
+    with open(pickle_path2, "rb") as f:
+        mfcc_list3 = (pickle.load(f))           
     
     for i in range(len(mfcc_list)):   
-        mfcc_list[i].extend(mfcc_list2[i])        
+        mfcc_list[i].extend(mfcc_list2[i])   
+    
+    for i in range(len(mfcc_list)):   
+        mfcc_list[i].extend(mfcc_list3[i])   
         
         
     X = mfcc_list[0]
@@ -77,12 +80,12 @@ def initialize(frame_length = frame_length ):
     
     y = np.array(mfcc_list[1])
     y = np.array(y, dtype=int)
+    #make sure incoming data has 3 as the dog even type otherwise will not work
     y = np.where(y == 3, 1, 0)
     return X , y
     
 
 def data_set(X,y,train = False):
-    
     X_1 = []
     y_1= []
     #Pad the data
@@ -197,7 +200,7 @@ def block_vert(z):
 #     return item
 
 X,y=initialize()
-X_tr, X_test, y_tr, y_test = train_test_split(X,y, test_size= .15) 
+X_tr, X_test, y_tr, y_test = train_test_split(X,y, test_size= .15, random_state=42) 
 
 X_train, y_train = data_set(X_tr, y_tr)
 X_test, y_test = data_set(X_test, y_test)
@@ -243,11 +246,7 @@ X_test, y_test = data_set(X_test, y_test)
 class New_model(tf.keras.Model):
     def __init__(self, module):
         super().__init__()
-        # self.num_classes =  num_classes
-        self.pre2d =tf.keras.layers.Conv2D(3, 2, strides=(1, 1), padding='same', activation='swish', name= "pre2d")
-        # tensor = tf.div(tf.subtract(tensor, tf.reduce_min(tensor) ), 
-        #                 tf.subtract(tf.reduce_max(tensor),tf.reduce_min(tensor)
-        #                 )
+        self.pre2d =tf.keras.layers.Conv2D(3,(3,3),padding='same', name= "pre2d")
         self.dense1 = tf.keras.layers.Dense(512, activation = 'relu', name = 'dense1')
         self.dense2 = tf.keras.layers.Dense(256, activation = 'relu', name = 'dense2')
         self.head =  tf.keras.layers.Dense(1, activation ='sigmoid')
@@ -296,7 +295,9 @@ class New_model(tf.keras.Model):
 
 
 model = New_model( module = module)
-SCHEDULE_LENGTH = 45
+
+
+SCHEDULE_LENGTH = 25
 SCHEDULE_BOUNDARIES = [200, 300, 400, 500]
 # SCHEDULE_LENGTH = SCHEDULE_LENGTH * 512 / BATCH_SIZE        
 BATCH_SIZE = 64
@@ -310,14 +311,15 @@ lr_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries=SC
                                                                    values=[lr, lr*0.1, lr*0.1, lr*0.001, lr*0.0001])
 # lr_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries=SCHEDULE_BOUNDARIES,   values=[lr*0.001, lr*0.0001, lr*0.00001, lr*0.00001])
 optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule, momentum=0.9)
-# optimizer = tfa.optimizers.RectifiedAdam() # cannot make model with TFA into a light model will fail every time 
-# optimizer = tf.keras.optimizers.Adam()
+# foptimizer = tfa.optimizers.RectifiedAdam() # cannot make model with TFA into a light model will fail every time 
+optimizer = tf.keras.optimizers.Adam()
 
 loss_fn = tf.keras.losses.BinaryCrossentropy()
 
 
+callback_save = "E:/python/1c_f_model_test.h5"
 model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath='E:/python/1c_f_model.h5',
+        filepath=callback_save,
         save_weights_only=True,
         monitor='accuracy',
         mode='auto',
@@ -332,7 +334,7 @@ model.compile(optimizer=optimizer,
 
 def load_check():
     model.build(input_shape = (BATCH_SIZE,100,frame_length,1))
-    model.load_weights('E:/python/1c_f_model.h5')
+    model.load_weights(callback_save)
 
 def chain_train(carts):
     global X_train
@@ -379,9 +381,6 @@ def save_lite():
     # input_details = interpreter.get_input_details()
     # output_details = interpreter.get_output_details()
     # Save the model.
-    with open('woof_friend_final1.tflite', 'wb') as f:
+    with open('woof_friend_final.tflite', 'wb') as f:
       f.write(tflite_model)
-
-    
-     
 

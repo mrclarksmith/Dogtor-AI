@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+audiosave/
 audio_files/
 ML/data
 build/
