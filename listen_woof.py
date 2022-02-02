@@ -30,7 +30,7 @@ else:
 # Setting Initiation
 VERSION = '0.0.1'
 SAVEAUDIO = True # Save each trigger of audio to a file
-playback = True  # playback dog barking sounds
+playback = False  # playback dog barking sounds
 DOCKER = False  # docker tensorflow server does not work on arm65
 plot_show = True  # shows plot for every sound that activates prediction function aka a loud sound
 sleep_time = 5  # seconds after the computer barks back, we sleep
@@ -141,7 +141,7 @@ def loudness():
 def save_audio(data, name):
     p = Path('./audiosave/')
     p.mkdir(parents=True, exist_ok=True)
-    extra = stream.read(44100)
+    # extra = stream.read(44100)
     path = name+".wav"
     max_16bit = 2**15
     data = data * max_16bit
@@ -184,7 +184,6 @@ def callback(indata, frames, _ , status, woof= 0):
 
                 if plot_show == True:
                     p.put([data, buff])
-                    
                     
                 if (prediction > .70) and ( SAVEAUDIO is True):
                     now = round(time.time())
