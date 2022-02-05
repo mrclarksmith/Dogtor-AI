@@ -13,17 +13,30 @@ WINDOW_TYPE = 'hann'
 FEATURE = 'mel'
 HOP_LENGTH = N_FFT//1
 frame_length = 97
+def test_data():
+    return np.random.rand(40,87)
 
-def normalize(x, a=0, b= 1):
-    y = ( (b-a)*( x- x.min()) / ( x.max() - x.min() ) ) +(a)
-    return y
+def test_audio():
+    buff = np.random.rand(26000,).astype(dtype=np.float32)
+    audio_buffer = buff[np.newaxis, :]
+    return  audio_buffer
+
+def test_audio_one():
+    return  np.random.rand(26000,)
+
+
+def normalize(x):
+    x /= np.max(np.abs(x),axis=0)
+    return x
+
 
 
 def power_to_db(S):
     S_DB = librosa.power_to_db(S, ref=np.max)
     return S_DB
 
-
+    
+    
 def run_lite_model(X, interpreter):
     # Get input and output tensors.
     input_details = interpreter.get_input_details()
@@ -98,18 +111,19 @@ def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, addi
         return prediction
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+def predict_test(audio_buffer, confidence=.93, wav=False, sr=22050, additional_data=True):
+    #audio_buffer set up to analize multiple frames at the same time by passing a bach of mels into tensorflow
+    mfcc_m = []
+    for audio in audio_buffer:
+        data = extract_features_mel(audio, wav=wav, sr=sr)
+        data = power_to_db(data)
+        data = normalize(data)
+        data_padded = pad_data(data)
+        mfcc_m.append(data_padded) 
+    
+    data_padded_m = np.array(mfcc_m)    
+    X = data_padded_m[..., np.newaxis]  
+    X = np.array(X, np.float32)
 
 
 

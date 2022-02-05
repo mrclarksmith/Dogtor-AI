@@ -121,21 +121,29 @@ def loudness():
                             device=dev_mic,
                             )
     stream.start()
-    n_sample = stream.read(int(RATE*1))[0]  # reads 4 seconds of scilence
+    n_sample = stream.read(int(RATE*2))[0]  # reads 4 seconds of scilence
     stream.stop()
     stream.close()
-    noise_sample = n_sample
+    
+    sample_range = []
+    for i in range(int(len(n_sample)/100)):
+        sample_range.append( np.abs(n_sample[i*100:(i+1)*100]).max() )
+    
+    sample_range.sort()
+    sample_range[:int(len(n_sample)/100*.4)]
+    loud_threshold = max(sample_range)*1.23
+    
     print("Noise Sample distribution variance")
     # plotAudio2(noise_sample)
-    variance(noise_sample)
-    if variance(noise_sample) > .000001:
-        loud_threshold = np.mean(np.abs(noise_sample))
-        noise_sample = noise_sample[np.abs(noise_sample) < loud_threshold*1]
-        loud_threshold = np.max(np.abs(noise_sample))*1
+    # variance(noise_sample)
+    # if variance(noise_sample) > .000001:
+    #     loud_threshold = np.mean(np.abs(noise_sample))
+    #     noise_sample = noise_sample[np.abs(noise_sample) < loud_threshold*1]
+    #     loud_threshold = np.max(np.abs(noise_sample))*1
 
-    else:
-        loud_threshold = np.max(np.abs(noise_sample))*1
-    print(variance(noise_sample))
+    # else:
+    #     loud_threshold = np.max(np.abs(noise_sample))*1
+    # print(variance(noise_sample))
     # plotAudio2(noise_sample)
     print("Loud threshold", loud_threshold)
     return loud_threshold
@@ -220,7 +228,8 @@ def callback(indata, frames, _ , status, woof= 0):
                 print("inside silence reign:", "Listening to buffer",frames," samples")
             else:
                 audio_buffer = buff[np.newaxis, :]
-                woof, prediction, data = predict(audio_buffer, interpreter, confidence=.93, additional_data = True)
+                woof, prediction, data = predict(audio_buffer, interpreter, confidence=.93, additional_data=True)
+                prediction= .99
                 if (prediction > .70) and ( SAVEAUDIO is True) and (flag_save == True):
                     put_in_queue = True
                     flag_save = False
