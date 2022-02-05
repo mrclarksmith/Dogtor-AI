@@ -43,9 +43,7 @@ RATE = 22050  # Samples per second : Setting custom rate to 22050 instead of 441
 REC_AFTER =2 # NUmber x Buffer_seconds to record after the event has occured
 # Variable initiation #do not change
 save_name = 0  # Used for saving waves files # Not sued currently
-buff = np.array([])  # Saves as global data buffer for predicting. If the bark happends at the end or beggining we ened to createa a window overlap
 save_buff =  np.array([])
-audio_buffer = 0  # Creates an array from buffer #TODO can be combined with buff variable
 woof_count = 0  # Initialize count for dog barks
 p = queue.Queue(1)
 put_in_queue = False # Indicates if que recording is to start
@@ -200,25 +198,22 @@ def thread_woof():
 ###############################################################################
 # main callback funtion for the stream : This is done in new thread per sounddevice
 # NOTE: that woof = 0 needed to set woof prediction to false
-def callback(indata, frames, _ , status, woof= 0):
+def callback(indata, frames, time, status, woof= 0):
     global woof_count
-    global buff
-    global audio_buffer
-    global PLOT_SHOW
     global save_buff
     global put_in_queue
     global p
     global flag_save
+
     if status:
-        print(status)
+        print(status, "status")
     if any(indata):
-        if all(buff) is None:
-            buff = np.squeeze(indata)
+        if all(save_buff) is None:
             save_buff =  np.squeeze(indata)
             print("init_concat")
         else:
-            buff = np.concatenate((buff[-int(RATE*BUFFER_ADD):], np.squeeze(indata)))
             save_buff = np.concatenate((save_buff[-int(RATE*3):], np.squeeze(indata)))
+            buff =  save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
             if put_in_queue == True:
                 p.put(np.squeeze(indata))
                 
@@ -227,18 +222,15 @@ def callback(indata, frames, _ , status, woof= 0):
                 pass
                 print("inside silence reign:", "Listening to buffer",frames," samples")
             else:
-                audio_buffer = buff[np.newaxis, :]
-                woof, prediction, data = predict(audio_buffer, interpreter, confidence=.93, additional_data=True)
-                prediction= .99
+                woof, prediction, data = predict(buff[np.newaxis, :], interpreter, confidence=.93, additional_data=True)
                 if (prediction > .70) and ( SAVEAUDIO is True) and (flag_save == True):
                     put_in_queue = True
                     flag_save = False
                     save_thread = Thread(target=save_audio, args=(save_buff, f"_S{prediction}"))
                     save_thread.start()   
-                # if woof == 1:
-                #     print("woof = 1")
-                #     th_w = Thread(target=thread_woof)
-                #     th_w.start()
+                if woof == 1:
+                    th_w = Thread(target=thread_woof)
+                    th_w.start()
 
                 
 
