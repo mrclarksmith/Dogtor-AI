@@ -3,7 +3,6 @@
 Created on Thu Oct 28 12:02:53 2021
 @author: Alexsey Gromov
 """
-
 import librosa
 import numpy as np
 
@@ -38,7 +37,7 @@ def run_lite_model(X, interpreter):
 def extract_features_mel(file_name, wav=False, sr=22050):
     try:
         if wav  == True:
-            file_name, _ = librosa.load(file_name, res_type='kaiser_best', sr=sr, mono=True)
+            file_name, _ = librosa.load(file_name, res_type='kaiser_fast', sr=sr, mono=True)
     except:
         return None
     try:
@@ -73,9 +72,8 @@ def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, addi
         data = power_to_db(data)
         data = normalize(data)
         data_padded = pad_data(data)
-        mfcc_m.append(data_padded)
-        print(data_padded.shape)
-        
+        mfcc_m.append(data_padded) 
+    
     data_padded_m = np.array(mfcc_m)    
     X = data_padded_m[..., np.newaxis]  
     X = np.array(X, np.float32)
@@ -85,9 +83,7 @@ def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, addi
     except Exception as e:
         print(e)
         print('error prediciton is set to zero value 0')
-        prediction = [[0]] #capture any big exception during rollout #do not activate until final version
-        
-    print(predictions)
+        prediction = [[0]] #capture any big exception during rollout #do not activate until final version    
     prediction = predictions[0][0]
     
     # Returns, 1/0 prediction score, the MEL spectrogram used for prediction
@@ -97,7 +93,6 @@ def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, addi
             return 1, prediction, data
         else:
             print("Predictions: score: ", prediction)
-            # print("we predict the number:" ,np.argmax(predictions) )
             return 0, prediction, data
     else:    
         return prediction

@@ -5,7 +5,7 @@
 Created on Thu Oct 28 18:55:38 2021
 @author: Alexsey Gromov
 """
-
+import argparse
 import os
 import queue
 import random
@@ -28,26 +28,40 @@ else:
     from sound_player import SoundPlayer, Sound
 
 # Setting Initiation
-VERSION = '0.0.1'
+VERSION = '0.0.2'
 SAVEAUDIO = True # Save each trigger of audio to a file
-playback = False  # playback dog barking sounds
+PLAYBACK = False  # PLAYBACK dog barking sounds
 DOCKER = False  # docker tensorflow server does not work on arm65
-plot_show = True  # shows plot for every sound that activates prediction function aka a loud sound
-sleep_time = 5  # seconds after the computer barks back, we sleep
-BUFFER_SECONDS = 1  # Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the dge
-BUFFER_ADD = .15  # Seconds to add to the buffer from previous buffer for prediction
-CHANNELS = 1  # Number of audio channels (left/Right/Mono)
-audio_dir = './audio_files/'  # Directory where the barking sounds are
+PLOT_SHOW = True  # shows plot for every sound that activates prediction function aka a loud sound
+SLEEP_TIME = 5  # seconds after the computer barks back, we sleep
+BUFFER_SECONDS = 1  # Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the edge. Max+buffer Add = 2 seconds
+BUFFER_ADD = .15  # Seconds to add to the buffer from previous buffer for prediction, cannot exceed 2 seconds combined with BUFFER_SECONDS
+CHANNELS = 1  # Number of audio channels (left/Right/Mono) #not configurable
+AUDIO_DIR = './audio_files/'  # Directory where the barking sounds are
 CONFIDENCE = .88  # Confidence of the prediciton model for identifying if the sound contains dog bark
-RATE = 22050  # Samples per second : Setting custom rate to 22050 instead of 44100 to save on computational time #Rate of the microphone is overwritten later
+RATE = 22050  # Samples per second : Setting custom rate to 22050 instead of 44100 to save on computational time #Rate of the microphone is overwritten later. Big dudu will happend if changed and you will not even know
+REC_AFTER =2 # NUmber x Buffer_seconds to record after the event has occured
 # Variable initiation #do not change
 save_name = 0  # Used for saving waves files # Not sued currently
 buff = np.array([])  # Saves as global data buffer for predicting. If the bark happends at the end or beggining we ened to createa a window overlap
 save_buff =  np.array([])
 audio_buffer = 0  # Creates an array from buffer #TODO can be combined with buff variable
 woof_count = 0  # Initialize count for dog barks
-p = queue.Queue()
+p = queue.Queue(1)
+put_in_queue = False # Indicates if que recording is to start
+flag_save = True # Indicates if a save process is running not to duplicate the sounds (queue management)
+parser = argparse.ArgumentParser(description='options')
+parser.add_argument('--SAVEAUDIO', dest='SAVEAUDIO', type=bool)
+parser.add_argument('--PLAYBACK', dest='PLAYBACK', type=bool)
+parser.add_argument('--DOCKER', dest='DOCKER', type=bool)
+parser.add_argument('--PLOT_SHOW', dest='PLOT_SHOW', type=bool)
+parser.add_argument('--SLEEP_TIME', dest='SLEEP_TIME', type=float, help='sleep after a bark')
+parser.add_argument('--BUFFER_SECONDS', dest='BUFFER_SECONDS', type=float)
+parser.add_argument('--BUFFER_ADD', dest='BUFFER_ADD', type=float)
+parser.add_argument('--CONFIDENCE', dest='CONFIDENCE', type=float)
+parser.add_argument('--MIC', dest='MIC', type=str)
 
+args = parser.parse_args()
 
 print(f"Dogtor AI version {VERSION} initializing...")
 
@@ -63,27 +77,27 @@ def run_tensor():
 if sys.platform in "darwin win32":
     def play_woof():
         # TODO change to sd.play() remove thread?
-        audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")])
+        audio_file = random.choice([x for x in os.listdir(AUDIO_DIR) if x.endswith(".mp3")])
         print(audio_file)
-        playsound(audio_dir+audio_file)
+        playsound(AUDIO_DIR+audio_file)
 else:
     def play_woof():
-        audio_file = random.choice([x for x in os.listdir(audio_dir) if x.endswith(".mp3")])
-        print(audio_dir+audio_file)
+        audio_file = random.choice([x for x in os.listdir(AUDIO_DIR) if x.endswith(".mp3")])
+        print(AUDIO_DIR+audio_file)
         player = SoundPlayer()
-        player.enqueue(Sound(audio_dir+audio_file), 1)
+        player.enqueue(Sound(AUDIO_DIR+audio_file), 1)
         player.play()
 
 
-def mic_index(dev_name='yeti'):  # get blue yetti mic index
+def mic_index(dev_name):  # get blue yetti mic index
     devices = sd.query_devices()
     print('index of available devices')
     for i, item in enumerate(devices):
         try:
-            if (dev_name in item['name'].lower()) and ('micro' in item['name'].lower()):
+            if (dev_name in item['name'].lower()) and ( item['max_output_channels']>0):
                 print(i, ":", item['name'], "Default SR: ", item['default_samplerate'])
-                sr = int(item['default_samplerate'])
-                return i, sr
+                # sr = int(item['default_samplerate'])
+                return i
         except:
             pass
 
@@ -139,18 +153,41 @@ def loudness():
 
 
 def save_audio(data, name):
-    p = Path('./audiosave/')
-    p.mkdir(parents=True, exist_ok=True)
-    # extra = stream.read(44100)
+    global flag_save
+    global put_in_queue
+    for i in range(REC_AFTER):
+        p_get =  p.get()
+        data = np.concatenate((data,p_get))
+    now = str(round(time.time()))
+    path_s = Path('./audiosave/')
+    path_s.mkdir(parents=True, exist_ok=True)
     path = name+".wav"
     max_16bit = 2**15
+    # print("dir made")
     data = data * max_16bit
     data = data.astype(np.int16)
-    with wave.open('./audiosave/'+path,mode='w') as wb:
+    with wave.open('./audiosave/'+now+path,mode='w') as wb:
         wb.setnchannels(1)
         wb.setsampwidth(2)
         wb.setframerate(RATE)
         wb.writeframes(data)  #Convert to byte string
+    print("saved")
+    flag_save = True
+    put_in_queue = False
+
+        
+def thread_woof():
+    global woof_count
+    print("woof woof a dog was heard")
+    woof_count += 1
+                    
+    if (woof_count == 1) & (PLAYBACK == True):
+        play_woof()
+        # music_thread = Thread(target=play_woof)
+        # music_thread.start()
+        woof_count = 0  # reset count
+        print(f'sleeping for {SLEEP_TIME} seconds')
+        # sd.sleep(int(SLEEP_TIME*1000))  # put the sound stream to sleep   ] 
 
 ###############################################################################
 # main callback funtion for the stream : This is done in new thread per sounddevice
@@ -159,59 +196,43 @@ def callback(indata, frames, _ , status, woof= 0):
     global woof_count
     global buff
     global audio_buffer
-    global plot_show
+    global PLOT_SHOW
     global save_buff
-    # global model
+    global put_in_queue
+    global p
+    global flag_save
     if status:
         print(status)
-
     if any(indata):
-        print(frames)
         if all(buff) is None:
             buff = np.squeeze(indata)
-            save_buff =  buff
+            save_buff =  np.squeeze(indata)
             print("init_concat")
         else:
             buff = np.concatenate((buff[-int(RATE*BUFFER_ADD):], np.squeeze(indata)))
-            save_buff = np.concatenate((save_buff[-int(RATE*4):], np.squeeze(indata)))
+            save_buff = np.concatenate((save_buff[-int(RATE*3):], np.squeeze(indata)))
+            if put_in_queue == True:
+                p.put(np.squeeze(indata))
+                
+                
             if(np.mean(np.abs(indata)) < loud_threshold):
                 pass
-                # Print("inside silence reign")
+                print("inside silence reign:", "Listening to buffer",frames," samples")
             else:
                 audio_buffer = buff[np.newaxis, :]
-                global data
                 woof, prediction, data = predict(audio_buffer, interpreter, confidence=.93, additional_data = True)
+                if (prediction > .70) and ( SAVEAUDIO is True) and (flag_save == True):
+                    put_in_queue = True
+                    flag_save = False
+                    save_thread = Thread(target=save_audio, args=(save_buff, f"_S{prediction}"))
+                    save_thread.start()   
+                # if woof == 1:
+                #     print("woof = 1")
+                #     th_w = Thread(target=thread_woof)
+                #     th_w.start()
 
-                if plot_show == True:
-                    p.put([data, buff])
-                    
-                if (prediction > .70) and ( SAVEAUDIO is True):
-                    now = round(time.time())
-                    save_thread = Thread(target=save_audio, args=(save_buff, f"save_{now}_S{prediction}"))
-                    save_thread.start()
-                    save_thread.join()    
-            if woof == 1:
-                print("woof woof a dog was heard")
-                woof_count += 1
-                print(woof_count)
-                                
-                if (woof_count == 1) & (playback == True):
-                    music_thread = Thread(target=play_woof)
-                    music_thread.start()
-                    woof_count = 0  # reset count
-                    print(f'sleeping for {sleep_time} seconds')
-                    sd.sleep(int(sleep_time*1000))  # put the sound stream to sleep
-                    music_thread.join()
-                    
+                
 
-                #save file to desctop to analize
-                # wf = wave.open('./save_audio/Aduio_clip_'+str(save_name)+".wav", 'wb')
-                # t = np.linspace(0., 1., samplerate)
-                # amplitude = np.iinfo(np.int16).max
-                # data = amplitude * np.sin(2. * np.pi * fs * t)
-                # write('./save_audio/Aduio_clip_'+str(save_name)+".wav", RATE, audio_buffer)
-                # print("File/Audio saved")
-                # save_name +=1
     else:
         print('no input')
 #####################################################################################
@@ -219,11 +240,17 @@ def callback(indata, frames, _ , status, woof= 0):
 #Set Recording Device
 devices = sd.query_devices()
 print(devices)
-dev_mic = int(input("Enter mic number to use: "))
+if args.MIC is None:
+    dev_mic = int(input("Enter mic number to use: "))
+else:
+    dev_mic = mic_index(args.MIC)
+
 loud_threshold =  loudness()
 
+
+
 #Loop Start #################################################################################################
-# if plot_show == True :
+# if PLOT_SHOW == True :
 #     import matplotlib.pyplot as plt #cannot be ran on raspberry pi for now
 #     from matplotlib.animation import FuncAnimation
 #     
@@ -237,9 +264,9 @@ loud_threshold =  loudness()
 try:
     print("loading model")
     interpreter = run_tensor()
-    print("loadinsound input")
+    print("loading sound input")
 
-    stream = sd.InputStream(device = int(dev_mic),
+    stream = sd.InputStream(device = dev_mic,
                         channels = 1,
                         samplerate = RATE,
                         callback=callback,
@@ -247,16 +274,16 @@ try:
                         )
     
     #Sets plot to update automatically on interval of 2?? what ever that is blit False is the only way it works with the update_plot function not having a return variable at the same time. 
-    # if plot_show == True:
+    # if PLOT_SHOW == True:
     #     ani = FuncAnimation(fig, update_plot, interval=2 , blit=False)
 
     with stream:
         while True:
-            if plot_show == True:
+            if PLOT_SHOW == True:
                 pass
-            response = input()
-            if response in ('', 'q', 'Q'):
-                break
+            # response = input()
+            # if response in ('', 'q', 'Q'):
+            #     break
             # for ch in response:
             #     if ch == '+':
             #         args.gain *= 2
