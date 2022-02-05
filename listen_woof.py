@@ -195,48 +195,7 @@ def thread_woof():
         print(f'sleeping for {SLEEP_TIME} seconds')
         # sd.sleep(int(SLEEP_TIME*1000))  # put the sound stream to sleep   ] 
 
-###############################################################################
-# main callback funtion for the stream : This is done in new thread per sounddevice
-# NOTE: that woof = 0 needed to set woof prediction to false
-def callback(indata, frames, time, status, woof= 0):
-    global woof_count
-    global save_buff
-    global put_in_queue
-    global p
-    global flag_save
 
-    if status:
-        print(status, "status")
-    if any(indata):
-        if all(save_buff) is None:
-            save_buff =  np.squeeze(indata)
-            print("init_concat")
-        else:
-            save_buff = np.concatenate((save_buff[-int(RATE*3):], np.squeeze(indata)))
-            buff =  save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
-            if put_in_queue == True:
-                p.put(np.squeeze(indata))
-                
-                
-            if(np.mean(np.abs(indata)) < loud_threshold):
-                pass
-                print("inside silence reign:", "Listening to buffer",frames," samples")
-            else:
-                woof, prediction, data = predict(buff[np.newaxis, :], interpreter, confidence=.93, additional_data=True)
-                if (prediction > .70) and ( SAVEAUDIO is True) and (flag_save == True):
-                    put_in_queue = True
-                    flag_save = False
-                    save_thread = Thread(target=save_audio, args=(save_buff, f"_S{prediction}"))
-                    save_thread.start()   
-                if woof == 1:
-                    th_w = Thread(target=thread_woof)
-                    th_w.start()
-
-                
-
-    else:
-        print('no input')
-#####################################################################################
 
 #Set Recording Device
 devices = sd.query_devices()
@@ -247,8 +206,6 @@ else:
     dev_mic = mic_index(args.MIC)
 
 loud_threshold =  loudness()
-
-
 
 #Loop Start #################################################################################################
 # if PLOT_SHOW == True :
@@ -263,6 +220,48 @@ loud_threshold =  loudness()
 #     fig.tight_layout(pad=0)
 
 try:
+    
+    ###############################################################################
+    # main callback funtion for the stream : This is done in new thread per sounddevice
+    # NOTE: that woof = 0 needed to set woof prediction to false
+    def callback(indata, frames, _ , status, woof= 0):
+        global woof_count
+        global save_buff
+        global put_in_queue
+        global p
+        global flag_save
+
+        if status:
+            print(status, "status")
+        if any(indata):
+            if all(save_buff) is None:
+                save_buff =  np.squeeze(indata)
+                print("init_concat")
+            else:
+                save_buff = np.concatenate((save_buff[-int(RATE*3):], np.squeeze(indata)))
+                buff =  save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
+                if put_in_queue == True:
+                    p.put(np.squeeze(indata))
+                    
+                    
+                if(np.mean(np.abs(indata)) < loud_threshold):
+                    pass
+                    print("inside silence reign:", "Listening to buffer",frames," samples")
+                else:
+                    woof, prediction, data = predict(buff[np.newaxis, :], interpreter, confidence=.93, additional_data=True)
+                    if (prediction > .70) and ( SAVEAUDIO is True) and (flag_save == True):
+                        put_in_queue = True
+                        flag_save = False
+                        save_thread = Thread(target=save_audio, args=(save_buff, f"_S{prediction}"))
+                        save_thread.start()   
+                    if woof == 1:
+                        th_w = Thread(target=thread_woof)
+                        th_w.start()
+        else:
+            print('no input')
+    #####################################################################################
+    
+    
     print("loading model")
     interpreter = run_tensor()
     print("loading sound input")
