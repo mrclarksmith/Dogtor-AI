@@ -249,7 +249,7 @@ try:
                 if put_in_queue == True:
                     p.put(np.squeeze(indata))
                         
-                if(np.mean(np.abs(indata)) < loud_threshold):
+                if(max(np.abs(indata)) < loud_threshold):
                     pass
                     print("inside silence reign:", "Listening to buffer",frames," samples")
                 else:
@@ -257,7 +257,7 @@ try:
                     if (prediction > .70) and ( SAVEAUDIO is True) and (flag_save == True):
                         put_in_queue = True
                         flag_save = False
-                        save_thread = Thread(target=save_audio, args=(save_buff, f"_S{prediction}"))
+                        save_thread = Thread(target=save_audio, args=(save_buff, f"_P{round(prediction,4)}L{max(np.abs(indata))}"))
                         save_thread.start()   
                     if woof == 1:
                         th_w = Thread(target=thread_woof)
