@@ -30,11 +30,9 @@ def normalize(x):
     return x
 
 
-
 def power_to_db(S):
     S_DB = librosa.power_to_db(S, ref=np.max)
     return S_DB
-
     
     
 def run_lite_model(X, interpreter):

@@ -34,7 +34,7 @@ PLAYBACK = False  # PLAYBACK dog barking sounds
 DOCKER = False  # docker tensorflow server does not work on arm65
 PLOT_SHOW = True  # shows plot for every sound that activates prediction function aka a loud sound
 SLEEP_TIME = 5  # seconds after the computer barks back, we sleep
-BUFFER_SECONDS = 1  # Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the edge. Max+buffer Add = 2 seconds
+BUFFER_SECONDS = 1.25  # Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the edge. Max+buffer Add = 2 seconds
 BUFFER_ADD = .15  # Seconds to add to the buffer from previous buffer for prediction, cannot exceed 2 seconds combined with BUFFER_SECONDS
 CHANNELS = 1  # Number of audio channels (left/Right/Mono) #not configurable
 AUDIO_DIR = './audio_files/'  # Directory where the barking sounds are
@@ -58,6 +58,7 @@ parser.add_argument('--BUFFER_SECONDS', dest='BUFFER_SECONDS', type=float)
 parser.add_argument('--BUFFER_ADD', dest='BUFFER_ADD', type=float)
 parser.add_argument('--CONFIDENCE', dest='CONFIDENCE', type=float)
 parser.add_argument('--MIC', dest='MIC', type=str)
+parser.add_argument('--LOUDNESS', dest='LOUDNESS', type=float)
 
 args = parser.parse_args()
 
@@ -205,7 +206,12 @@ if args.MIC is None:
 else:
     dev_mic = mic_index(args.MIC)
 
-loud_threshold =  loudness()
+
+if args.LOUDNESS is None:
+    loud_threshold =  loudness()
+else:
+    loud_threshold = args.LOUDNESS
+
 
 #Loop Start #################################################################################################
 # if PLOT_SHOW == True :
@@ -242,8 +248,7 @@ try:
                 buff =  save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
                 if put_in_queue == True:
                     p.put(np.squeeze(indata))
-                    
-                    
+                        
                 if(np.mean(np.abs(indata)) < loud_threshold):
                     pass
                     print("inside silence reign:", "Listening to buffer",frames," samples")
