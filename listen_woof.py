@@ -129,8 +129,8 @@ def loudness():
         sample_range.append( np.abs(n_sample[i*100:(i+1)*100]).max() )
     
     sample_range.sort()
-    sample_range[:int(len(n_sample)/100*.4)]
-    loud_threshold = max(sample_range)*1.23
+    sample_range = sample_range[:int(len(n_sample)/100*.4)]
+    loud_threshold = max(sample_range)*2
     
     print("Noise Sample distribution variance")
     # plotAudio2(noise_sample)
