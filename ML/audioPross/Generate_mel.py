@@ -139,7 +139,7 @@ def graph():
     y, sample_rate = librosa.load(file+file1, res_type='kaiser_fast', sr = 22050, mono =True)
     mfccs = librosa.feature.melspectrogram(y,sr=SR,
                                             n_fft=512,
-                                            hop_length=HOP_LENGTH, 
+                                            hop_length=N_FFT//2 , 
                                             n_mels=N_MELS, 
                                             htk=False, 
                                             # fmin=FMIN
@@ -147,7 +147,7 @@ def graph():
     
     mfccs3 = librosa.feature.melspectrogram(y,sr=SR,
                                             n_fft=512,
-                                            hop_length=HOP_LENGTH, 
+                                            hop_length=N_FFT//1 , 
                                             n_mels=N_MELS, 
                                             htk=False, 
                                             # fmin=FMIN

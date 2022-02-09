@@ -12,22 +12,15 @@ N_MELS = 100
 WINDOW_TYPE = 'hann'
 FEATURE = 'mel'
 HOP_LENGTH = N_FFT//1
-frame_length = 97
-def test_data():
-    return np.random.rand(40,87)
-
-def test_audio():
-    buff = np.random.rand(26000,).astype(dtype=np.float32)
-    audio_buffer = buff[np.newaxis, :]
-    return  audio_buffer
-
-def test_audio_one():
-    return  np.random.rand(26000,)
-
+frame_length = 97 # Maximum frames that TF model can take can take
+PAD = 20
 
 def normalize(x):
-    x /= np.max(np.abs(x),axis=0)
-    return x
+    b = 1
+    a = 0
+    y = ( (b-a)*( x- x.min()) / ( x.max() - x.min() ) ) +(a)
+    # x /= np.max(np.abs(x),axis=0)
+    return y
 
 
 def power_to_db(S):
@@ -66,8 +59,8 @@ def extract_features_mel(file_name, wav=False, sr=22050):
 def pad_data(data):
     # print(data.shape)
     #pad data before and after for better algorithm detection
-    if data.shape[1] <(frame_length-20):
-        data = np.pad(data,((0,0),(20,frame_length-data.shape[1]-20)),'constant',constant_values = (0))
+    if data.shape[1] <(frame_length-PAD):
+        data = np.pad(data,((0,0),(PAD,frame_length-data.shape[1]-PAD)),'constant',constant_values = (0))
     if data.shape[1] <frame_length:
         data = np.pad(data,((0,0),(0,frame_length-data.shape[1])),'constant',constant_values = (0))
     elif data.shape[1] >frame_length:
@@ -95,33 +88,17 @@ def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, addi
         print(e)
         print('error prediciton is set to zero value 0')
         prediction = [[0]] #capture any big exception during rollout #do not activate until final version    
-    prediction = predictions[0][0]
+    prediction = round(predictions[0][0], 4)
     
     # Returns, 1/0 prediction score, the MEL spectrogram used for prediction
     if additional_data == True:
         if (prediction> confidence ):# TF predicts in batches must specify we want first input of the multi input batch 
-            print("Predictions: score: ", prediction)
             return 1, prediction, data
         else:
-            print("Predictions: score: ", prediction)
             return 0, prediction, data
     else:    
         return prediction
 
-
-def predict_test(audio_buffer, confidence=.93, wav=False, sr=22050, additional_data=True):
-    #audio_buffer set up to analize multiple frames at the same time by passing a bach of mels into tensorflow
-    mfcc_m = []
-    for audio in audio_buffer:
-        data = extract_features_mel(audio, wav=wav, sr=sr)
-        data = power_to_db(data)
-        data = normalize(data)
-        data_padded = pad_data(data)
-        mfcc_m.append(data_padded) 
-    
-    data_padded_m = np.array(mfcc_m)    
-    X = data_padded_m[..., np.newaxis]  
-    X = np.array(X, np.float32)
 
 
 
