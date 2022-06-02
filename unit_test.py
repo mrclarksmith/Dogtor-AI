@@ -59,14 +59,20 @@ def test_audio_one():
 
 
 
+
+
 class Unit_Test(unittest.TestCase):
     
     @classmethod
     def setUpClass(self):
         filename1 = "./test/chunk2021-06-30_00-13-07.wav"
         filename2 = "./test/chunk2021-07-09_04-40-23.wav"
+        noise_sample_high_location = "./test/noise_high.wav"
+        noise_sample_low_location = "./test/noise_low.wav"
         self.indata_dog1, _ = librosa.load(filename1, res_type = 'kaiser_best', sr = 22050, mono = True)
         self.indata_dog2, _ = librosa.load(filename2, res_type = 'kaiser_best', sr = 22050, mono = True)
+        self.indata_noise_sample_high, _ = librosa.load(noise_sample_high_location, res_type = 'kaiser_best', sr = 22050, mono = True)
+        self.indata_noise_sample_low, _ = librosa.load(noise_sample_low_location, res_type = 'kaiser_best', sr = 22050, mono = True)
         self.indata_noise =  test_audio_one()
         self.interpreter = listen_woof.run_tensor()
         
@@ -82,7 +88,7 @@ class Unit_Test(unittest.TestCase):
         imgplot = plt.imshow(data)
         ax = fig.add_subplot(1, 2, 2)
         imgplot = plot_mel(self.indata_dog1)
-        self.assertGreater(prediction, .70)
+        self.assertGreater(prediction, .90)
         
     def test_predict1(self):
         woof, prediction, data = check_woof.predict(self.indata_dog2[np.newaxis, :], self.interpreter, confidence=.93, additional_data=True)
@@ -92,7 +98,7 @@ class Unit_Test(unittest.TestCase):
         imgplot = plt.imshow(data)
         ax = fig.add_subplot(1, 2, 2)
         imgplot = plot_mel(self.indata_dog2)
-        self.assertGreater(prediction, .70)
+        self.assertGreater(prediction, .90)
         
     def test_predict2(self):
         woof, prediction, data = check_woof.predict(self.indata_noise[np.newaxis, :], self.interpreter, confidence=.93, additional_data=True)
@@ -104,8 +110,15 @@ class Unit_Test(unittest.TestCase):
         imgplot = plot_mel(self.indata_noise)
         
         
+    def test_loudness_high(self):
+        loudness = listen_woof.loudness_thresh_calc(self.indata_noise_sample_high)
+        print("loudness high", loudness)
         
+    def test_loudness_low(self):
+        loudness = listen_woof.loudness_thresh_calc(self.indata_noise_sample_low)
+        print("loudness low", loudness)
         
+                
         
         
         

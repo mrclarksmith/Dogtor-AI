@@ -17,9 +17,62 @@ from threading import Thread
 from pathlib import Path
 import tensorflow as tf
 import time
-
+import librosa
 # importing custom python module 
 from check_woof import predict
+from scipy.signal import hilbert
+
+# class audioPros:
+
+#     def __init__(self, audio, sr=22050):
+#         self.audio = audio
+#         self.sr = sr
+
+#     def time_streach(self, rate):
+#         '''
+#         rate = Stretch factor
+#         '''
+#         self.audio = librosa.effects.time_stretch(self.audio, rate=rate)
+
+#     def pitch(self,n_steps):
+#         self.audio = librosa.effects.pitch_shift(self.audio, sr=self.sr, n_steps=n_steps)
+    
+#     def trim_scilence(self):
+#         ''' trim scilence based on threshold'''
+
+#     def _rms_mean_energy(self):
+#         #[sum(x)/^2]/n
+#         #rms = np.mean(np.power(self.audio,2))
+#         rmse = librosa.feature.rmse(self.audio, frame_length=2048, hop_length=512, center=True, pad_mode='reflect')
+#         return rmse
+#     def _zero_crossing_rate(self):
+#         zero_crossing = librosa.feature.zero_crossing_rate(y, frame_length=2048, hop_length=512, center=True)
+#         return zero_crossing
+
+#     def _short_time_energy(self):
+        
+#         if (n > 0) and (n< N-1): 
+#             h_n =  0.54-0.46 * np.cos(2*np.pi * n / (N-1) )
+#             np.sum(y)
+
+#     def _signal_covering(self):
+#         h = hilbert(self.audio)
+#         # |phi| = [ g(t)^2 + g_hat(t)^2 ]^(1/2)
+#         return abs(np.sqrt(np.power(self.audio,2)+np.power(h,2)))
+
+#     def dynamic_threshold(self):
+#         E = self._rmse_mean_energy()
+#         Z = self._zero_crossing_rate()
+#         l_e = (max(E) - min(E)) / max(E)
+#         l_z = (max(Z) - min(Z)) / max(Z)
+
+#         E_th = (1-l_e) * max(E) + l_e * min(E)
+#         Z_th = (1-l_z) * max(Z) + l_z * min(Z)
+
+
+
+#https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6068870/
+
 
 # darwin = macOS, win32 = Windows
 if sys.platform in "darwin win32":
@@ -87,12 +140,18 @@ def loudness(dev_mic):
     stream.stop()
     stream.close()
     
+    loud_treshold = loudness_thresh_calc(n_sample)
+    
+    return loud_treshold
+    
+
+def loudness_thresh_calc(n_sample):
     sample_range = []
     for i in range(int(len(n_sample)/100)):
         sample_range.append( np.abs(n_sample[i*100:(i+1)*100]).max() )
     
     sample_range.sort()
-    sample_range = sample_range[:int(len(n_sample)/100*.4)]
+    sample_range = sample_range[:int(len(n_sample)/100*.7)]
     loud_threshold = round(max(sample_range)*3, 4)
     
     print("Noise Sample distribution variance")
@@ -178,13 +237,13 @@ def callback(indata, frames, _ , status, woof= 0):
             print("init_concat", frames)
         else:
             save_buff = np.concatenate((save_buff[-int(RATE*.5):], np.squeeze(indata)))
-            buff =  save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
+            buff = save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
             if put_in_queue == True:
                 p.put(np.squeeze(indata))
                 
             indata_loudness = round(max(np.abs(indata))[0],4)
             if indata_loudness < loud_threshold:
-                print("inside silence reign:", "Listening to buffer",frames,"samples", "Loudness:",indata_loudness)
+                print("inside silence reign:", "Listening to buffer",frames,"samples", "Loudness:", indata_loudness)
             else:
                 woof, prediction, data = predict(buff[np.newaxis, :], interpreter, confidence=.93, additional_data=True)
                 print("Predictions: score:", prediction, "Loudness:", indata_loudness, "/", loud_threshold)
@@ -298,9 +357,13 @@ if __name__ == "__main__":
 
 
     if args.LOUDNESS is None:
-        loud_threshold =  loudness(dev_mic)
+        loud_threshold = loudness(dev_mic)
+        if loud_threshold == 0:
+            print("Mic is off or not working, try different driver or mic")
+        print("loudness set to ambient noise")
     else:
         loud_threshold = args.LOUDNESS
+        print("loudness set to:", args.LOUDNESS)
 
     print("loading model")
     interpreter = run_tensor()

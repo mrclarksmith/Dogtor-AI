@@ -8,7 +8,7 @@ import numpy as np
 
 SR = 22050
 N_FFT = 512
-N_MELS = 100
+N_MELS = 96
 WINDOW_TYPE = 'hann'
 FEATURE = 'mel'
 HOP_LENGTH = N_FFT//1
