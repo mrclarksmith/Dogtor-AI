@@ -10,9 +10,9 @@ __pycache__/
 .Python
 audiosave/
 audio_files/
-ML/data/model
-ML/data/random_mel_audio
-ML/data/training_checkpoints
+ML/audioPross/model
+ML/audioPross/random_mel_audio
+ML/audioPross/training_checkpoints
 ML/data
 build/
 develop-eggs/
