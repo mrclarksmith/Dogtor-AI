@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+'''Written by Alexsey Gromov
+
+'''
 """
 Needed for DogPI
 """
@@ -386,67 +389,9 @@ bit_model.initialize_data()
 bit_model.checkpoint_data()
 
 bit_model.train()
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    # def chain_train(carts):
-    #     global X_train
-    #     global y_train
-    #     global X_tr
-    #     global y_tr
-        
-    #     for i in range(carts):
-    #         print(f"chain_train {i}")
-    #         X_train, y_train = data_set(X_tr, y_tr, train=True)
-            
-    #         train()
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+bit_model.save_lite() # saves woof_friend_final.tflite
     
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     
 def generate_stft(audios):
