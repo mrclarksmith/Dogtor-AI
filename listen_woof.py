@@ -175,7 +175,7 @@ def thread_play_woof(generate):
             # array = BARK_ENCODING
             array = np.array([np.random.normal(loc=0, scale=1, size=10)],  # use scale 2 to 10 for additonal variation
                              dtype=np.float32)  # Random Bark variation
-            array = BARK_ENCODING + 1.*array  # add variation
+            array = BARK_ENCODING + .5*array  # add variation
             print("playing generated audio")
             generate_point_audio(vae_lite_model, gan_lite_model, array, save=False)
         else:
