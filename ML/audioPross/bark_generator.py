@@ -4,6 +4,7 @@ Created on Thu Jun  9 12:17:51 2022
 
 @author: server
 """
+import sounddevice as sd
 from shutil import copy
 from sklearn.datasets import make_blobs
 from sklearn.cluster import DBSCAN
@@ -252,7 +253,7 @@ def generate_samples_audio_chain(lite_model_vae_encoder, lite_model_vae_decoder,
         save_signals(audio_generated, "./model/")
 
 
-def generate_point_audio(lite_model_vae_decoder,  lite_model_gan, encoding, save=True):
+def generate_point_audio(lite_model_vae_decoder,  lite_model_gan, encoding, save=True, return_audio=False):
     reconstructed = run_lite_model(encoding, lite_model_vae_decoder)
     # code to load model
     mel_set = reconstructed.T
@@ -274,6 +275,8 @@ def generate_point_audio(lite_model_vae_decoder,  lite_model_gan, encoding, save
     # save audio
     if save:
         save_signals(audio_generated, "./model/")
+    if return_audio:
+        return audio_generated
 
 
 def point_finder(lite_model_vae_encoder, lite_model_vae_decoder, lite_model_gan, df):
@@ -347,6 +350,7 @@ def num_of_clusters(features):
     plt.show()
 
 
+# Load Models into memeory
 number_of_audio_samples = 1
 lite_model_vae_encoder = load_lite("model", "vae", suffix="_encoder")
 lite_model_vae_decoder = load_lite("model", "vae", suffix="_decoder")
@@ -377,3 +381,7 @@ array = [[-3.0, -1.6774293,  0.5526688,  7.012168, -2.2925243,
 ar = np.array(array, dtype="float")
 arc = ar.astype(np.float32)
 generate_point_audio(lite_model_vae_decoder, lite_model_gan, arc, save=True)
+
+audio = generate_point_audio(lite_model_vae_decoder, lite_model_gan,
+                             arc, save=True, return_audio=True)
+sd.play(np.squeeze(audio), samplerate=22050)
