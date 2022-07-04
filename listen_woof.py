@@ -6,6 +6,13 @@ Created on Thu Oct 28 18:55:38 2021
 @author: Alexsey Gromov
 Program to bark back at those loud dogs
 """
+
+from flask_socketio import SocketIO, emit
+
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import matplotlib.pyplot as plt
+
+from PIL import Image
 import argparse
 import os
 import queue
@@ -14,16 +21,166 @@ import sys
 import numpy as np
 import sounddevice as sd
 import wave
-from threading import Thread
+from threading import Thread, Event
 from pathlib import Path
 import tensorflow as tf
 import time
 import librosa
+import librosa.display
 # importing custom python module
 from check_woof import predict
 from scipy.signal import hilbert
 
 
+from flask import Flask, render_template, url_for, request, redirect, make_response, Response, send_file, jsonify
+import json
+import random
+
+import base64
+from io import BytesIO
+from flask import Flask, render_template
+from PIL import Image
+import io
+
+from flask import Flask
+from matplotlib.figure import Figure
+
+plot_url_q = queue.Queue(1)
+
+##############################################################################
+app = Flask(__name__)
+socketio = SocketIO(app)
+thread = Thread()
+thread_stop_event = Event()
+
+
+# class RandomThread(Thread):
+#     def __init__(self):
+#         self.delay = 1
+#         super(RandomThread, self).__init__()
+
+#     def randomNumberGenerator(self):
+#         """
+#         Generate a random number every 1 second and emit to a socketio instance (broadcast)
+#         Ideally to be run in a separate thread?
+#         """
+#         # infinite loop of magical random numbers
+#         print("Making random numbers")
+#         while not thread_stop_event.isSet():
+#             number = round(random.random()*10, 3)
+#             print(number)
+#             socketio.emit('newnumber', {'number': number}, namespace='/test')
+#             time.sleep(self.delay)
+
+#     def run(self):
+#         self.randomNumberGenerator()
+
+
+@app.route('/', methods=["GET", "POST"])
+def index():
+    return render_template('index.html')
+
+
+@socketio.on('my event')                          # Decorator to catch an event called "my event":
+def test_message(message):                        # test_message() is the event callback function.
+    emit('my response', {'data': 'got it!'})      # Trigger a new event called "my response"
+    # that can be caught by another callback later in the program.
+
+# Thread Class to send data to Local Server to view spectorgrams
+
+
+class SendDataThread(Thread):
+    def __init__(self):
+        super(SendDataThread, self).__init__()
+
+    def run_data_to_flask(self):
+        global plot_url_q
+        while True:
+            try:
+                data = plot_url_q.get_nowait()
+                arr, woof_detected = data
+
+                if woof_detected:
+                    w_d = "woof detected"
+                else:
+                    w_d = "no dog detected"
+
+                # response = make_response(json.dumps(arr.tolist()))
+                # response.content_type = 'application/json'
+                socketio.emit('newnumber', {'number': json.dumps(arr.tolist())}, namespace='/test')
+                print("emit")
+            except queue.Empty:
+                time.sleep(.3)
+                pass
+
+    def run(self):
+        self.run_data_to_flask()
+
+
+@socketio.on('connect', namespace='/test')
+def test_connect():
+    # need visibility of the global thread object
+    global thread
+    print('Client connected')
+
+    # Start the random number generator thread only if the thread has not been started before.
+    try:
+        if not thread.isAlive():
+            print("Starting Thread")
+            thread = SendDataThread()
+            thread.start()
+    except:
+        if not thread.is_alive():
+            print("Starting Thread")
+            thread = SendDataThread()
+            thread.start()
+
+
+def scale_minmax(X, min=0.0, max=1.0):
+    X_std = (X - X.min()) / (X.max() - X.min())
+    X_scaled = X_std * (max - min) + min
+    return X_scaled
+
+
+def spectrogram_image(data):
+    global plot_url_q
+    # # use log-melspectrogram
+    # mels = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels,
+    #                                         n_fft=hop_length*2, hop_length=hop_length)
+    # mels = numpy.log(mels + 1e-9) # add small number to avoid log(0)
+
+    # min-max scale to fit inside 8-bit range
+    img = scale_minmax(data, 0, 255).astype(np.uint8)
+    img = np.flip(img, axis=0)  # put low frequencies at the bottom in image
+    img = 255-img  # invert. make black==more energy
+
+    plot_url = base64.b64encode(img.getvalue()).decode('utf8')
+    plot_url_q.put(img)
+
+
+def picture_cue_generate(data):
+    # Generate the figure **without using pyplot**.
+
+    # fig = plt.Figure()
+    # canvas = FigureCanvas(fig)
+    # ax = fig.add_subplot(111)
+    p1 = librosa.display.specshow(librosa.amplitude_to_db(
+        data, ref=np.max), y_axis='log', x_axis='time')
+    p1.show()
+    # Save it to a temporary buffer.
+    buf = BytesIO()
+    print(data.shape, "datashape")
+    # fig.savefig(buf, format="png")
+    # # Embed the result in the html output.
+    data = base64.b64encode(buf.getbuffer()).decode("ascii")
+    data_que.put(data)
+    return f"<img src='data:image/png;base64,{data}'/>"
+
+
+# https://github.com/damyanbogoev/flask-bookshelf
+
+
+###########################################################################
 # darwin = macOS, win32 = Windows
 if sys.platform in "darwin win32":
     from playsound import playsound
@@ -68,6 +225,7 @@ def generate_point_audio(lite_model_vae_decoder,  lite_model_gan, encoding, save
 # 2 versio; one for raspberry-pi, the other one for windows
 if sys.platform in "darwin win32":
     def play_woof():
+        print("playing Woof")
         # TODO change to sd.play() remove thread?
         audio_file = random.choice([x for x in os.listdir(AUDIO_DIR) if x.endswith(".mp3")])
         print(audio_file)
@@ -158,11 +316,15 @@ def save_audio(data, name):
     for i in range(REC_AFTER):
         p_get = p.get()
         data = np.concatenate((data, p_get))
-
+    # put_in_queue = False
     save_generated_bark(data, name)
 
     flag_save = True
-    put_in_queue = False
+
+
+def test_thread(data):
+    print("test thread")
+    picture_cue_generate(data)
 
 
 def thread_play_woof(generate):
@@ -194,6 +356,7 @@ def callback(indata, frames, _, status, woof=False):
     global put_in_queue
     global p
     global flag_save
+    global plot_url_q
 
     if status:
         print(status, "status")
@@ -207,7 +370,7 @@ def callback(indata, frames, _, status, woof=False):
             save_buff = np.concatenate((save_buff[-int(RATE*.5):], np.squeeze(indata)))
             buff = save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
 
-            # Que stops beeing filled if a bark
+            # Que stops beeing filled if a bark is heard
             if put_in_queue == True:
                 p.put(np.squeeze(indata))
 
@@ -215,12 +378,16 @@ def callback(indata, frames, _, status, woof=False):
             if indata_loudness < loud_threshold:
                 print("inside silence reign:", "Listening to buffer",
                       frames, "samples", "Loudness:", indata_loudness)
+                # plot_url_q.put([buff, False])
             else:
                 # woof get sets to "True" if woof is heard
                 woof, prediction, data = predict(
                     buff[np.newaxis, :], interpreter, confidence=.93, additional_data=True)
                 print("Predictions: score:", prediction, "Loudness:",
                       indata_loudness, "/", loud_threshold)
+
+                plot_url_q.put([np.squeeze(indata), woof])
+
                 if (prediction > .70) and (SAVEAUDIO is True) and (flag_save == True):
                     put_in_queue = True
                     flag_save = False
@@ -236,38 +403,65 @@ def callback(indata, frames, _, status, woof=False):
 
 
 #Loop Start #########################################################################
-def main():
-    stream = sd.InputStream(device=dev_mic,
+
+    # else:
+    #     fig = Figure()
+    #     ax = fig.subplots()
+
+    #     ax.specgram(arr, NFFT=512, Fs=22050)
+
+    #     buf = io.BytesIO()
+    #     fig.savefig(buf, format="jpeg")
+    #     encoded_img_data = base64.b64encode(buf.getbuffer())
+    #     return render_template("index.html", img_data=encoded_img_data.decode('utf-8'), woof_detected=w_d)
+
+
+# @app.route('/image_data')
+# def image():
+#     # my numpy array
+#     arr = plot_url_q.get()
+
+#     # convert numpy array to PIL Image
+#     img = Image.fromarray(arr.astype('uint8'))
+
+#     # create file-object in memory
+#     file_object = io.BytesIO()
+
+#     # write PNG in file-object
+#     img.save(file_object, 'PNG')
+
+#     # move to beginning of file so `send_file()` it will read from start
+#     file_object.seek(0)
+
+#     return send_file(file_object, mimetype='image/PNG')
+
+#     # if queue1.empty():
+#     #     pass
+#     # data = plot_url_q.get()
+#     # img_data = encoded_img_data = base64.b64encode(data.getvalue())
+#     # img_data=base64.b64encode(data.getvalue().decode('utf8'))
+#     # return render_template("index.html", img_data=img_data)
+
+
+def main_stream():
+    try:
+        with sd.InputStream(device=dev_mic,
                             channels=1,
                             samplerate=RATE,
                             callback=callback,
-                            blocksize=int(RATE*BUFFER_SECONDS),
-                            )
-    try:
-        with stream:
-            while True:
-                if PLOT_SHOW == True:
-                    pass
-                # response = input()
-                # if response in ('', 'q', 'Q'):
-                #     break
-                # for ch in response:
-                #     if ch == '+':
-                #         args.gain *= 2
-                #     elif ch == '-':
-                #         args.gain /= 2
-                #     else:
-                #         print('\x1b[31;40m', usage_line.center(args.columns, '#'),
-                #               '\x1b[0m', sep='')
-                #         break
-
+                            blocksize=int(RATE*BUFFER_SECONDS)
+                            ):
+            print('#' * 80)
+            print('press Return to quit')
+            print('#' * 80)
+            input()
+    except KeyboardInterrupt:
+        parser.exit('')
     except Exception as e:
-        #subprocess.Popen('docker stop tensor')
-        print("end", e)
+        parser.exit(type(e).__name__ + ': ' + str(e))
 
 
 if __name__ == "__main__":
-
     # Setting Initiation
     VERSION = '0.0.3'
     SAVEAUDIO = False  # Save each trigger of audio to a file
@@ -288,11 +482,14 @@ if __name__ == "__main__":
                                5.7915726,  -1.7413237,  3.5634975, -3.0460133,  -3.57509345]],
                              dtype=np.float32)
 
+    WEB = True  # Sets state if to fun Flask Server
+
     # Variable initiation #DO NOT CHANGE!#
     save_name = 0  # Used for saving waves files # Not sued currently
     save_buff = np.array([])
     woof_count = 0  # Initialize count for dog barks
     p = queue.Queue(1)
+    data_que = queue.Queue(5)
     put_in_queue = False  # Indicates if que recording, it gets desabled during audio save, and enabled again after
     # Indicates if a save process is running not to duplicate the sounds (queue management)
     flag_save = True
@@ -309,6 +506,7 @@ if __name__ == "__main__":
     parser.add_argument('--CONFIDENCE', dest='CONFIDENCE', type=float)
     parser.add_argument('--MIC', dest='MIC', type=str)
     parser.add_argument('--LOUDNESS', dest='LOUDNESS', type=float)
+    parser.add_argument('--WEB', dest='WEB', type=bool)
 
     args = parser.parse_args()
 
@@ -318,10 +516,15 @@ if __name__ == "__main__":
     # Set Recording Device
     devices = sd.query_devices()
     print(devices)
+    print("setting mic")
     if args.MIC is None:
-        dev_mic = int(input("Enter mic number to use: "))
+        print("what mic to use")
+        dev_mic = input("Enter mic number to use:")
+        dev_mic = int(dev_mic)
+        print("mic selected", dev_mic)
     else:
-        dev_mic = mic_index(args.MIC)
+        "mic was entered at run time"
+        dev_mic = mic_index(int(args.MIC))
 
     if args.LOUDNESS is None:
         loud_threshold = loudness(dev_mic)
@@ -337,7 +540,12 @@ if __name__ == "__main__":
     vae_lite_model = load_lite_model("vae_model_decoder_tflite.tflite")
     gan_lite_model = load_lite_model("gan_model_tflite.tflite")
     print("loading sound input")
-    main()
+
+    # app.run()  # runs Flask
+    main_thread = Thread(target=main_stream)
+    main_thread.start()
+    if WEB:
+        socketio.run(app)
 
 
 # needs to be exported to alternate module
