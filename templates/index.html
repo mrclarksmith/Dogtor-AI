@@ -13,8 +13,8 @@
   
   canvas {
     display: block;
-    height: 10%;
-    width: 10%;
+    height: 60%;
+    width: 100%;
   }
   /*
   h1 {
@@ -42,40 +42,67 @@ window.addEventListener('click', () => {
 
 function initialize() {
   document.body.querySelector('h1').remove();
-
-  //Canvas FFT in time domain initialization
-  const CVS = document.body.querySelector('canvas');
-  const CTX = CVS.getContext('2d');
-
-
+  const bufferFill = 1378 //samples to take from socket and process into fft (x20)
 
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const W = CVS.width = window.innerWidth;
-  const H = CVS.height = window.innerHeight;
-
-  const bufferFill = 2756
   const myArrayBuffer = audioCtx.createBuffer(1, bufferFill , 22050);
   
   //Create Analyser
   const analyser = audioCtx.createAnalyser();
   let nowBuffering = myArrayBuffer.getChannelData(0)
+
+  analyser.fftSize = 2048;
+  const bufferLength = analyser.frequencyBinCount;
+  var array = new Uint8Array(bufferLength);
+
+
+  //Canvas FFT in time domain initialization
+  const CVS = document.body.querySelector('canvas');
+  const CTX = CVS.getContext('2d');
+  const W = CVS.width = window.innerWidth;
+  const H = CVS.height = window.innerHeight;
+  const h = H / bufferLength;
+  const x = W - 1;
+  CTX.fillStyle = 'hsl(280, 100%, 10%)';
+  CTX.fillRect(0, 0, W, H);
+
+  function draw_fft(DATA) {   
+      let imgData = CTX.getImageData(1, 0, W - 1, H);
+      //
+      const LEN = DATA.length;
+      CTX.fillRect(0, 0, W, H);
+      CTX.putImageData(imgData, 0, 0);   
+         
+      for (let i = 0; i < bufferLength; i++) {
+        let rat = DATA[i] / 255;
+        let hue = Math.round(rat * 120 + 280 % 360);
+        let sat = '100%';
+        let lit = 10 + 70 * rat + '%';
+        CTX.beginPath();
+        CTX.strokeStyle = `hsl(${hue}, ${sat}, ${lit})`;
+        CTX.moveTo(x, H - i * h);
+        CTX.lineTo(x, H - (i * h + h));
+        CTX.stroke();
         
-  
+      }
+      console.log("Storke")
+    }
+
 
 
   $(document).ready(function(){
     //connect to the socket server.
     var socket = io.connect('http://' + document.domain + ':' + location.port + '/test');
     var numbers_received = [];
+    
     //receive details from server
     socket.on('newnumber', function(chunk) {
-        for (var z = 0; z < 10; z++) {
-
+        for (var z = 0; z < 20; z++) {
+          
           var data = JSON.parse(chunk.number);
           data =  data.slice(z*bufferFill, (z+1)*bufferFill)
           console.time('Execution Time');
           for (var i = 0; i < data.length; i++) {
-            // nowBuffering[i] = Math.random() * 2 - 1;
             nowBuffering[i] = data[i];
           }
           console.timeEnd('Execution Time');
@@ -84,98 +111,37 @@ function initialize() {
           
           // Get an AudioBufferSourceNode.
           // This is the AudioNode to use when we want to play an AudioBuffer
-          const source = audioCtx.createBufferSource();
+          
           // set the buffer in the AudioBufferSourceNode
+          const source = audioCtx.createBufferSource();
           source.buffer = myArrayBuffer;
           //Analyser
-          analyser.fftSize = 256;
-          const bufferLength = analyser.frequencyBinCount;
-          var array = new Uint8Array(bufferLength);
+
+          
           source.connect(analyser);
           analyser.getByteFrequencyData(array);
           console.log("FFT_array: " + array);
 
           // start the source playing
           source.start(0);
+
+          draw_fft(array)
+
         }
         //maintain a list of ten numbers
-        if (numbers_received.length >= 10){
-            numbers_received.shift()
-        }
-        numbers_received.push(chunk.number);
-        numbers_string = '';
-        for (var i = 0; i < numbers_received.length; i++){
-            numbers_string = numbers_string + '<p>' + numbers_received[i].toString() + '</p>';
-        }
-        $('#log').html(numbers_string);
+        // if (numbers_received.length >= 10){
+        //     numbers_received.shift()
+        // }
+        // numbers_received.push(chunk.number);
+        // numbers_string = '';
+        // for (var i = 0; i < numbers_received.length; i++){
+        //     numbers_string = numbers_string + '<p>' + numbers_received[i].toString() + '</p>';
+        // }
+        // $('#log').html(numbers_string);
     });
 });
 
 }
-
-/*function initialize() {
-  document.body.querySelector('h1').remove();
-  const CVS = document.body.querySelector('canvas');
-  const CTX = CVS.getContext('2d');
-  const W = CVS.width = window.innerWidth;
-  const H = CVS.height = window.innerHeight;
-
-  // const ACTX = new AudioContext();
-  // const ANALYSER = ACTX.createAnalyser();
-
-  // ANALYSER.fftSize = 4096;
-
-  // navigator.mediaDevices.
-  // getUserMedia({ audio: true }).
-  // then(process);
-
-  // function requestData() {
-  //   //Ajax call to get the Data from Flask
-  //   var requests =  $.get('/img_to_flask');
-  //   var tm = requests.done(function (result) {
-  //     console.log("[TEMPERATURE]", result);
-  //   });
-  
-  
-  // }
-/*
-  function process() {
-    const W = 32*20 // 20 timesteps
-    const H = 96*32
-    const LEN = 32
-    const h = H / 32;
-    const x = W - 1;
-    CTX.fillStyle = 'hsl(280, 100%, 10%)';
-    CTX.fillRect(0, 0, W, H);
-    console.log("starting loop");
-
-
-    function loop(DATA) {
-      //window.requestAnimationFrame(loop);
-
-      let imgData = CTX.getImageData(1, 0, W - 1, H);
-      //
-      CTX.fillRect(0, 0, W, H);
-      CTX.putImageData(imgData, 0, 0);
-      CTX.drawImage(img, 10, 10);   
-         
-      // for (let i = 0; i < LEN; i++) {
-      //   let rat = DATA[i] /// 255;
-      //   let hue = Math.round(rat * 120 + 280 % 360);
-      //   let sat = '100%';
-      //   let lit = 10 + 70 * rat + '%';
-      //   CTX.beginPath();
-      //   CTX.strokeStyle = `hsl(${hue}, ${sat}, ${lit})`;
-      //   CTX.moveTo(x, H - i * h);
-      //   CTX.lineTo(x, H - (i * h + h));
-      //   CTX.stroke();
-      // }
-    }
-  
-
-*/  
-
-
 </script>
 </head>
 <body>

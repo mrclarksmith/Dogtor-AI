@@ -544,6 +544,7 @@ if __name__ == "__main__":
     # app.run()  # runs Flask
     main_thread = Thread(target=main_stream)
     main_thread.start()
+    print("Starting Socket")
     if WEB:
         socketio.run(app)
 
