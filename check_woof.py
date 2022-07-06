@@ -12,7 +12,7 @@ N_MELS = 96
 WINDOW_TYPE = 'hann'
 FEATURE = 'mel'
 HOP_LENGTH = N_FFT//1
-frame_length = 97  # Maximum frames that TF model can take can take
+FRAME_LENGTH = 97  # Maximum frames that TF model can take can take (Frames=time Frames)
 PAD = 20
 
 
@@ -62,14 +62,14 @@ def extract_features_mel(file_name, wav=False, sr=22050):
 def pad_data(data):
     # print(data.shape)
     # pad data before and after for better algorithm detection
-    if data.shape[1] < (frame_length-PAD):
+    if data.shape[1] < (FRAME_LENGTH-PAD):
         data = np.pad(
-            data, ((0, 0), (PAD, frame_length-data.shape[1]-PAD)), 'constant', constant_values=(0))
-    if data.shape[1] < frame_length:
+            data, ((0, 0), (PAD, FRAME_LENGTH-data.shape[1]-PAD)), 'constant', constant_values=(0))
+    if data.shape[1] < FRAME_LENGTH:
         data = np.pad(
-            data, ((0, 0), (0, frame_length-data.shape[1])), 'constant', constant_values=(0))
-    elif data.shape[1] > frame_length:
-        data = data[:][:frame_length]
+            data, ((0, 0), (0, FRAME_LENGTH-data.shape[1])), 'constant', constant_values=(0))
+    elif data.shape[1] > FRAME_LENGTH:
+        data = data[:][:FRAME_LENGTH]
     return data
 
 
@@ -80,7 +80,9 @@ def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, addi
         data = extract_features_mel(audio, wav=wav, sr=sr)
         data = power_to_db(data)
         data = normalize(data)
+        print("data before pad", data.shape)
         data_padded = pad_data(data)
+        print("data after pad", data_padded.shape)
         mfcc_m.append(data_padded)
 
     data_padded_m = np.array(mfcc_m)
@@ -99,7 +101,7 @@ def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, addi
     # Returns, 1/0 prediction score, the MEL spectrogram used for prediction
     if additional_data == True:
         if (prediction > confidence):  # TF predicts in batches must specify we want first input of the multi input batch
-            return True, prediction, data
+            return True, prediction, data  # Returns Unpadded Data
         else:
             return False, prediction, data
     else:

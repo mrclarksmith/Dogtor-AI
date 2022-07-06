@@ -105,12 +105,20 @@ class SendDataThread(Thread):
                 else:
                     w_d = "no dog detected"
 
+                # Send Image
+                # img =  Image.fromarray(arr.astype('uint8'))
+
+                # # create file-object in memroy
+                # file_object = io.BytesIO()
+                # #write PNG in file-object
+                # img.save(file_object, 'PNG')
+
                 # response = make_response(json.dumps(arr.tolist()))
                 # response.content_type = 'application/json'
+                # socketio.emit('newnumber', {'number': json.dumps(arr.tolist())}, namespace='/test')
                 socketio.emit('newnumber', {'number': json.dumps(arr.tolist())}, namespace='/test')
                 print("emit")
             except queue.Empty:
-                time.sleep(.3)
                 pass
 
     def run(self):
@@ -370,7 +378,7 @@ def callback(indata, frames, _, status, woof=False):
             save_buff = np.concatenate((save_buff[-int(RATE*.5):], np.squeeze(indata)))
             buff = save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
 
-            # Que stops beeing filled if a bark is heard
+            # Que stops beeing filled if a bark is heard, this is disabled, que is always filled
             if put_in_queue == True:
                 p.put(np.squeeze(indata))
 
@@ -386,8 +394,11 @@ def callback(indata, frames, _, status, woof=False):
                 print("Predictions: score:", prediction, "Loudness:",
                       indata_loudness, "/", loud_threshold)
 
-                plot_url_q.put([np.squeeze(indata), woof])
-
+                # put "data" from prediction in que trimmed for current frame of audio
+                print(len(indata), buff.shape, data.shape)
+                #
+                plot_url_q.put([data.T[:54], woof])
+                print("dtamaxmin: ", data.max(), data.min())
                 if (prediction > .70) and (SAVEAUDIO is True) and (flag_save == True):
                     put_in_queue = True
                     flag_save = False
@@ -530,7 +541,7 @@ if __name__ == "__main__":
         loud_threshold = loudness(dev_mic)
         if loud_threshold == 0:
             print("Mic is off or not working, try different driver or mic")
-        print("loudness set to ambient noise")
+        print("loudness set to ambient noise", loud_threshold)
     else:
         loud_threshold = args.LOUDNESS
         print("loudness set to:", args.LOUDNESS)
