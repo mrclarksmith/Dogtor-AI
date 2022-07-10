@@ -4,7 +4,10 @@ Created on Tue Feb  8 21:48:57 2022
 
 @author: server
 """
-
+import sys
+import os
+import time
+os.chdir(sys.path[0])
 import unittest
 import listen_woof
 import check_woof
@@ -12,7 +15,6 @@ import numpy as np
 import librosa 
 import librosa.display
 import matplotlib.pyplot as plt
-
 
 
 def normalize(x, a=0, b= 1):
@@ -71,10 +73,10 @@ class Unit_Test(unittest.TestCase):
         noise_sample_low_location = "./test/noise_low.wav"
         self.indata_dog1, _ = librosa.load(filename1, res_type = 'kaiser_best', sr = 22050, mono = True)
         self.indata_dog2, _ = librosa.load(filename2, res_type = 'kaiser_best', sr = 22050, mono = True)
-        self.indata_noise_sample_high, _ = librosa.load(noise_sample_high_location, res_type = 'kaiser_best', sr = 22050, mono = True)
-        self.indata_noise_sample_low, _ = librosa.load(noise_sample_low_location, res_type = 'kaiser_best', sr = 22050, mono = True)
+        self.indata_noise_sample_high, _ = librosa.load(noise_sample_high_location, res_type = 'kaiser_fast', sr = 22050, mono = True)
+        self.indata_noise_sample_low, _ = librosa.load(noise_sample_low_location, res_type = 'kaiser_fast', sr = 22050, mono = True)
         self.indata_noise =  test_audio_one()
-        self.interpreter = listen_woof.run_tensor()
+        self.interpreter = listen_woof.load_lite_model("woof_friend_final.tflite")
         
 
     def setUp(self):
@@ -82,6 +84,7 @@ class Unit_Test(unittest.TestCase):
     
     def test_predict(self):
         woof, prediction, data = check_woof.predict(self.indata_dog1[np.newaxis, :], self.interpreter, confidence=.93, additional_data=True)
+        print("dog 1 prediction")
         print(prediction)
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
@@ -92,6 +95,7 @@ class Unit_Test(unittest.TestCase):
         
     def test_predict1(self):
         woof, prediction, data = check_woof.predict(self.indata_dog2[np.newaxis, :], self.interpreter, confidence=.93, additional_data=True)
+        print("dog 2 prediction")
         print(prediction)
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
@@ -99,9 +103,16 @@ class Unit_Test(unittest.TestCase):
         ax = fig.add_subplot(1, 2, 2)
         imgplot = plot_mel(self.indata_dog2)
         self.assertGreater(prediction, .90)
+
+
+    def test_time(self):
+        tik =  time.time()
+        woof, prediction, data = check_woof.predict(self.indata_dog1[np.newaxis, :], self.interpreter, confidence=.93, additional_data=True)
+        print("Predict dog 1 time: ", time.time()-tik)
         
     def test_predict2(self):
         woof, prediction, data = check_woof.predict(self.indata_noise[np.newaxis, :], self.interpreter, confidence=.93, additional_data=True)
+        print("NOise prediction")
         print(prediction)
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)

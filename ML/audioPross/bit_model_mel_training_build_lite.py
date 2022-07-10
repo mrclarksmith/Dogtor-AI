@@ -24,7 +24,7 @@ from tensorflow.keras.utils import to_categorical
 import tensorflow_hub as hub
 import tensorflow_addons as tfa
 import time
-import _audio_helper as ah #custom library
+import _audio_helper as ah #custom library ah=AudioHelper
 tf.random.set_seed(42)
 
 
@@ -33,9 +33,11 @@ tf.get_logger().setLevel("ERROR")
 
 FRAME_LENGTH = 97 #NUMBER OF TIME SAMPLES
 FRAME_HEIGHT = 96 #Number of mel channels
-
+sr = 22050
+N_FFT = 512
+HOP_LENGTH = N_FFT//2
 # Defining hyperparameters
-DESIRED_SAMPLES = FRAME_LENGTH*256
+DESIRED_SAMPLES = FRAME_LENGTH*HOP_LENGTH # 24,832 samples
 
 LEARNING_RATE_GEN = 1e-5
 LEARNING_RATE_DISC = 1e-5
@@ -115,18 +117,12 @@ class  bit_trainer:
         self.data = pd.concat([dog_pd, not_dog_pd],ignore_index=True)    
         X_train, X_test, y_train, y_test = self.split_data(self.data.X, self.data.y, test_size=.18)
 
-        self.X_train =  np.array(X_train.tolist())[...,  np.newaxis]
+        self.X_train = np.array(X_train.tolist())[...,  np.newaxis]
         self.X_test = np.array(X_test.tolist())[...,  np.newaxis]
         self.y_train = np.array(y_train.tolist())[...,  np.newaxis]
         self.y_test = np.array(y_test.tolist())[...,  np.newaxis]
     
         self.compile_model()
-    
-    
-    
-
-    
-    
     
     @staticmethod
     def _get_wav_files(directory):
@@ -211,9 +207,8 @@ class  bit_trainer:
         return item
     
     def preprocess(self, filename, desired_samples=DESIRED_SAMPLES, load=True):
-        sr = 22050
-        N_FFT = 512
-        HOP_LENGTH = N_FFT//2
+
+
         # n_mfcc = FRAME_HEIGHT              
         # window_type = 'hann' 
         # feature = 'mel'     
@@ -239,10 +234,11 @@ class  bit_trainer:
         # Taking the magnitude of the STFT output  
         mel = self._power_to_db(mel)
         mel = self._normalize(mel)
+    
         mel = self._data_pad(mel, frame_lenght)
+        # Add random blockout blocks to obfuscate the data
         mel = self.block_horiz(mel)
         mel = self.block_vert(mel)
-
         return mel
     
     
@@ -347,11 +343,7 @@ def _unit_test(bit_model):
     bit_model.not_dog_files = bit_model.not_dog_files[:50]
     return bit_model
     
-    
-    
-    
-    
-    
+
     
     
 dog_dir = "D:/python2/woof_friend/Dogtor-AI/ML/data/ML_SET/dog"
@@ -404,7 +396,7 @@ def generate_stft(audios):
     return generated_stfts
 
 
-
+# generates empty space on each side randomly at each pass
 def data_set(X,y,train = False):
     X_1 = []
     y_1= []
@@ -421,7 +413,6 @@ def data_set(X,y,train = False):
                             ),'constant',constant_values = (0)
                         )
                     )
-            
             y_1.append(z)
         elif item.shape[1] >frame_length:
             before = int((item.shape[1]-frame_length)*random.random()*.3 )
@@ -442,7 +433,7 @@ def data_set(X,y,train = False):
             
     
     X_1 = np.dstack( X_1) #convert list to np array
-    X_1 = np.rollaxis( X_1,-1)        #bring last axis to front
+    X_1 = np.rollaxis( X_1,-1) #bring last axis to front
     X_1 = np.expand_dims( X_1,-1) # add channel of 1 for conv2d to work
 
        

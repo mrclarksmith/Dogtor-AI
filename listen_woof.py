@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import argparse
 import os
-import queue
+#import queue
 import random
 import sys
 import numpy as np
@@ -27,6 +27,8 @@ import tensorflow as tf
 import time
 import librosa
 import librosa.display
+from multiprocessing import Process
+from multiprocessing import Queue
 # importing custom python module
 from check_woof import predict
 from scipy.signal import hilbert
@@ -44,36 +46,13 @@ import io
 
 from flask import Flask
 from matplotlib.figure import Figure
-
-plot_url_q = queue.Queue(1)
+os.chdir(sys.path[0])
 
 ##############################################################################
 app = Flask(__name__)
 socketio = SocketIO(app)
 thread = Thread()
 thread_stop_event = Event()
-
-
-# class RandomThread(Thread):
-#     def __init__(self):
-#         self.delay = 1
-#         super(RandomThread, self).__init__()
-
-#     def randomNumberGenerator(self):
-#         """
-#         Generate a random number every 1 second and emit to a socketio instance (broadcast)
-#         Ideally to be run in a separate thread?
-#         """
-#         # infinite loop of magical random numbers
-#         print("Making random numbers")
-#         while not thread_stop_event.isSet():
-#             number = round(random.random()*10, 3)
-#             print(number)
-#             socketio.emit('newnumber', {'number': number}, namespace='/test')
-#             time.sleep(self.delay)
-
-#     def run(self):
-#         self.randomNumberGenerator()
 
 
 @app.route('/', methods=["GET", "POST"])
@@ -100,10 +79,11 @@ class SendDataThread(Thread):
                 data = plot_url_q.get_nowait()
                 arr, woof_detected = data
 
+                # Lights up a bar underneath the mel spectrogram that detects the bark
                 if woof_detected:
-                    w_d = "woof detected"
+                    w_d = 1
                 else:
-                    w_d = "no dog detected"
+                    w_d = 0
 
                 # Send Image
                 # img =  Image.fromarray(arr.astype('uint8'))
@@ -116,7 +96,10 @@ class SendDataThread(Thread):
                 # response = make_response(json.dumps(arr.tolist()))
                 # response.content_type = 'application/json'
                 # socketio.emit('newnumber', {'number': json.dumps(arr.tolist())}, namespace='/test')
-                socketio.emit('newnumber', {'number': json.dumps(arr.tolist())}, namespace='/test')
+                socketio.emit('newnumber', {
+                                            'number': json.dumps(arr.tolist()),
+                                            'woof': w_d
+                                            }, namespace='/test')
                 print("emit")
             except queue.Empty:
                 pass
@@ -132,6 +115,7 @@ def test_connect():
     print('Client connected')
 
     # Start the random number generator thread only if the thread has not been started before.
+    # Catches exception for PYTHON 3.9 "_" added 
     try:
         if not thread.isAlive():
             print("Starting Thread")
@@ -150,42 +134,6 @@ def scale_minmax(X, min=0.0, max=1.0):
     return X_scaled
 
 
-def spectrogram_image(data):
-    global plot_url_q
-    # # use log-melspectrogram
-    # mels = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels,
-    #                                         n_fft=hop_length*2, hop_length=hop_length)
-    # mels = numpy.log(mels + 1e-9) # add small number to avoid log(0)
-
-    # min-max scale to fit inside 8-bit range
-    img = scale_minmax(data, 0, 255).astype(np.uint8)
-    img = np.flip(img, axis=0)  # put low frequencies at the bottom in image
-    img = 255-img  # invert. make black==more energy
-
-    plot_url = base64.b64encode(img.getvalue()).decode('utf8')
-    plot_url_q.put(img)
-
-
-def picture_cue_generate(data):
-    # Generate the figure **without using pyplot**.
-
-    # fig = plt.Figure()
-    # canvas = FigureCanvas(fig)
-    # ax = fig.add_subplot(111)
-    p1 = librosa.display.specshow(librosa.amplitude_to_db(
-        data, ref=np.max), y_axis='log', x_axis='time')
-    p1.show()
-    # Save it to a temporary buffer.
-    buf = BytesIO()
-    print(data.shape, "datashape")
-    # fig.savefig(buf, format="png")
-    # # Embed the result in the html output.
-    data = base64.b64encode(buf.getbuffer()).decode("ascii")
-    data_que.put(data)
-    return f"<img src='data:image/png;base64,{data}'/>"
-
-
-# https://github.com/damyanbogoev/flask-bookshelf
 
 
 ###########################################################################
@@ -230,7 +178,7 @@ def generate_point_audio(lite_model_vae_decoder,  lite_model_gan, encoding, save
         save_audio(audio_generated, "gen_bark")
 
 
-# 2 versio; one for raspberry-pi, the other one for windows
+# 2 versios; one for raspberry-pi, the other one for windows
 if sys.platform in "darwin win32":
     def play_woof():
         print("playing Woof")
@@ -277,9 +225,10 @@ def variance(data):
 def loudness(dev_mic):
     stream = sd.InputStream(channels=1,
                             device=dev_mic,
+                            samplerate=RATE,
                             )
     stream.start()
-    n_sample = stream.read(int(RATE*2))[0]  # reads 4 seconds of scilence
+    n_sample = stream.read(int(RATE*4))[0]  # reads 4 seconds of scilence
     stream.stop()
     stream.close()
 
@@ -329,12 +278,6 @@ def save_audio(data, name):
 
     flag_save = True
 
-
-def test_thread(data):
-    print("test thread")
-    picture_cue_generate(data)
-
-
 def thread_play_woof(generate):
     global woof_count
     print("dog was heard")
@@ -355,9 +298,9 @@ def thread_play_woof(generate):
 
 ###############################################################################
 # main callback funtion for the stream : This is done in new thread per sounddevice
-# NOTE: that woof = 0 is needed to set woof prediction to false
+# NOTE: that variable woof = 0 is needed to set woof prediction to false, this is so that you can disable playback of dog bark if too many barks happend 
 
-
+tok_tok = 0 
 def callback(indata, frames, _, status, woof=False):
     global woof_count
     global save_buff
@@ -365,7 +308,7 @@ def callback(indata, frames, _, status, woof=False):
     global p
     global flag_save
     global plot_url_q
-
+    global tok_tok
     if status:
         print(status, "status")
     if any(indata):
@@ -375,30 +318,37 @@ def callback(indata, frames, _, status, woof=False):
         else:
             # Save buffer keeps previous buffers sound to be able to join to together with present to\
             # dog bark if it happened inbeween buffer frames.
+            # SAVEBUFF + indata 
+            # [......|||] + [|||||||] = .5 Last Seconds + .9 Second  
+
+            # save_buff is generic buffer that can be used to pass audio to save function to save a full clip
             save_buff = np.concatenate((save_buff[-int(RATE*.5):], np.squeeze(indata)))
+            # Takes the end of the buffer for most recent audio from general buffer
             buff = save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
 
+            # //To be deleted
             # Que stops beeing filled if a bark is heard, this is disabled, que is always filled
             if put_in_queue == True:
                 p.put(np.squeeze(indata))
 
+            # only triggers Tensorflow if there is loud bark / audio
             indata_loudness = round(max(np.abs(indata))[0], 4)
             if indata_loudness < loud_threshold:
                 print("inside silence reign:", "Listening to buffer",
                       frames, "samples", "Loudness:", indata_loudness)
-                # plot_url_q.put([buff, False])
+                plot_url_q.put([np.zeros((77,96)), 0])
+
             else:
                 # woof get sets to "True" if woof is heard
                 woof, prediction, data = predict(
-                    buff[np.newaxis, :], interpreter, confidence=.93, additional_data=True)
+                    buff[np.newaxis, :], interpreter, confidence=CONFIDENCE, additional_data=True)
                 print("Predictions: score:", prediction, "Loudness:",
                       indata_loudness, "/", loud_threshold)
-
                 # put "data" from prediction in que trimmed for current frame of audio
-                print(len(indata), buff.shape, data.shape)
-                #
-                plot_url_q.put([data.T[:54], woof])
-                print("dtamaxmin: ", data.max(), data.min())
+                #print(len(indata), buff.shape, data.shape)
+                # Cuts off Extra buffer to make the audio seamless
+
+                plot_url_q.put([data.T[:77], woof])
                 if (prediction > .70) and (SAVEAUDIO is True) and (flag_save == True):
                     put_in_queue = True
                     flag_save = False
@@ -410,6 +360,7 @@ def callback(indata, frames, _, status, woof=False):
                     th_w.start()
     else:
         print('no input')
+
 #####################################################################################
 
 
@@ -467,9 +418,11 @@ def main_stream():
             print('#' * 80)
             input()
     except KeyboardInterrupt:
-        parser.exit('')
+        pass
+        # parser.exit('')
     except Exception as e:
-        parser.exit(type(e).__name__ + ': ' + str(e))
+        pass
+        # parser.exit(type(e).__name__ + ': ' + str(e))
 
 
 if __name__ == "__main__":
@@ -482,25 +435,34 @@ if __name__ == "__main__":
     DOCKER = False  # docker tensorflow server does not work on arm65
     PLOT_SHOW = True  # shows plot for every sound that activates prediction function aka a loud sound
     SLEEP_TIME = 0  # seconds after the computer barks back, we sleep
-    BUFFER_SECONDS = 1.25  # Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the edge. Max+buffer Add = 2 seconds
-    BUFFER_ADD = .15  # Seconds to add to the buffer from previous buffer for prediction, cannot exceed 2 seconds combined with BUFFER_SECONDS
+    # Cannot Exceed 1.1261678004 Seconds for Analysis 
+    BUFFER_SECONDS = .9  # Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the edge. Max+buffer Add = 2 seconds
+    BUFFER_ADD = .226  # Seconds to add to the buffer from previous buffer for prediction, cannot exceed 2 seconds combined with BUFFER_SECONDS
     CHANNELS = 1  # Number of audio channels (left/Right/Mono) #not configurable
-    AUDIO_DIR = './audio_files/'  # Directory where the barking sounds are
-    CONFIDENCE = .68  # Confidence of the prediciton model for identifying if the sound contains dog bark
+    AUDIO_DIR = './audio_files/'  # Directory where the barking sounds are to be played back
+    CONFIDENCE = .75  # Confidence of the prediciton model for identifying if the sound contains dog bark
     RATE = 22050  # Samples per second : Setting custom rate to 22050 instead of 44100 to save on computational time #Rate of the microphone is overwritten later. Big dudu will happend if changed and you will not even know
     REC_AFTER = 2  # NUmber x Buffer_seconds to record after the event has occured
     BARK_ENCODING = np.array([[-3.0, -1.6774293,  0.5526688,  7.012168, -2.2925243,
                                5.7915726,  -1.7413237,  3.5634975, -3.0460133,  -3.57509345]],
-                             dtype=np.float32)
-
+                             dtype=np.float32) # Bark encoding gotten from the real dog file as a basis for generating new barks
     WEB = True  # Sets state if to fun Flask Server
-
+    PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256) # slice of MEL spectrogram to send to web server that represents current time frame 256 is hop size from check_woof.py  
+    
+    INTERPRETER_DIR = "woof_friend_final.tflite"
+    VAE_LITE_MODEL_DIR = "vae_model_decoder_tflite.tflite"
+    GAN_LITE_MODEL_DIR = "gan_model_tflite.tflite"
     # Variable initiation #DO NOT CHANGE!#
     save_name = 0  # Used for saving waves files # Not sued currently
     save_buff = np.array([])
     woof_count = 0  # Initialize count for dog barks
-    p = queue.Queue(1)
-    data_que = queue.Queue(5)
+    # p = queue.Queue(1)
+    # data_que = queue.Queue(5)
+    # plot_url_q = queue.Queue(3) # que flask server to send to website
+
+    p = Queue(1)
+    data_que = Queue(5)
+    plot_url_q = Queue(3) # que flask server to send to website
     put_in_queue = False  # Indicates if que recording, it gets desabled during audio save, and enabled again after
     # Indicates if a save process is running not to duplicate the sounds (queue management)
     flag_save = True
@@ -527,15 +489,13 @@ if __name__ == "__main__":
     # Set Recording Device
     devices = sd.query_devices()
     print(devices)
-    print("setting mic")
+    print("setting mic..")
     if args.MIC is None:
-        print("what mic to use")
         dev_mic = input("Enter mic number to use:")
         dev_mic = int(dev_mic)
-        print("mic selected", dev_mic)
+        print("Mic selected:", dev_mic)
     else:
-        "mic was entered at run time"
-        dev_mic = mic_index(int(args.MIC))
+        print("Mic was entered at run time")
 
     if args.LOUDNESS is None:
         loud_threshold = loudness(dev_mic)
@@ -545,19 +505,20 @@ if __name__ == "__main__":
     else:
         loud_threshold = args.LOUDNESS
         print("loudness set to:", args.LOUDNESS)
-
-    print("loading model 3 models")
-    interpreter = load_lite_model("woof_friend_final.tflite")
-    vae_lite_model = load_lite_model("vae_model_decoder_tflite.tflite")
-    gan_lite_model = load_lite_model("gan_model_tflite.tflite")
-    print("loading sound input")
+    print("Loading 3 Tensorflow Light Models...")
+    interpreter = load_lite_model(INTERPRETER_DIR)
+    vae_lite_model = load_lite_model(VAE_LITE_MODEL_DIR)
+    gan_lite_model = load_lite_model(GAN_LITE_MODEL_DIR)
 
     # app.run()  # runs Flask
-    main_thread = Thread(target=main_stream)
-    main_thread.start()
+    # main_thread = Thread(target=main_stream)
+    # main_thread.start()
+    p_main = Process(target=main_stream)
+    p_main.start()
+    # socketio.start_background_task(main_stream)
     print("Starting Socket")
     if WEB:
-        socketio.run(app)
+       socketio.run(app, host='0.0.0.0', port=5000)
 
 
 # needs to be exported to alternate module

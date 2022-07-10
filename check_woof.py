@@ -5,15 +5,17 @@ Created on Thu Oct 28 12:02:53 2021
 """
 import librosa
 import numpy as np
+import time #used for checking timing only
 
 SR = 22050
 N_FFT = 512
-N_MELS = 96
+N_MELS = 96 # Height of the PICTURE (data points per time frame)
 WINDOW_TYPE = 'hann'
 FEATURE = 'mel'
-HOP_LENGTH = N_FFT//1
+HOP_LENGTH = N_FFT//2
 FRAME_LENGTH = 97  # Maximum frames that TF model can take can take (Frames=time Frames)
-PAD = 20
+FMIN = 200
+PAD = 20 # Pad Length in the beggining if ther is more than 20 frames to pasd
 
 
 def normalize(x):
@@ -50,7 +52,8 @@ def extract_features_mel(file_name, wav=False, sr=22050):
                                                n_fft=N_FFT,
                                                hop_length=HOP_LENGTH,
                                                n_mels=N_MELS,
-                                               htk=False,)
+                                               htk=False,
+                                               fmin=FMIN,)
         return mfccs
     except Exception as e:
         print("Error encountered getting mel spectrogram: ", e)
@@ -69,33 +72,32 @@ def pad_data(data):
         data = np.pad(
             data, ((0, 0), (0, FRAME_LENGTH-data.shape[1])), 'constant', constant_values=(0))
     elif data.shape[1] > FRAME_LENGTH:
-        data = data[:][:FRAME_LENGTH]
+        data = data[:,:FRAME_LENGTH]
     return data
 
 
 def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, additional_data=True):
     # audio_buffer set up to analize multiple frames at the same time by passing a bach of mels into tensorflow
+
     mfcc_m = []
     for audio in audio_buffer:
         data = extract_features_mel(audio, wav=wav, sr=sr)
         data = power_to_db(data)
         data = normalize(data)
-        print("data before pad", data.shape)
         data_padded = pad_data(data)
-        print("data after pad", data_padded.shape)
+
         mfcc_m.append(data_padded)
 
     data_padded_m = np.array(mfcc_m)
     X = data_padded_m[..., np.newaxis]
     X = np.array(X, np.float32)
-
     try:
         predictions = run_lite_model(X, interpreter)
     except Exception as e:
         print(e)
         print('error prediciton is set to zero value 0')
         # capture any big exception during rollout #do not activate until final version
-        prediction = [[0]]
+        predictions = [[0]]
     prediction = round(predictions[0][0], 4)
 
     # Returns, 1/0 prediction score, the MEL spectrogram used for prediction
