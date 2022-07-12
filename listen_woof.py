@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import argparse
 import os
-#import queue
+import queue
 import random
 import sys
 import numpy as np
@@ -27,8 +27,8 @@ import tensorflow as tf
 import time
 import librosa
 import librosa.display
-from multiprocessing import Process
-from multiprocessing import Queue
+# from multiprocessing import Process
+# from multiprocessing import Queue
 # importing custom python module
 from check_woof import predict
 from scipy.signal import hilbert
@@ -76,7 +76,7 @@ class SendDataThread(Thread):
         global plot_url_q
         while True:
             try:
-                data = plot_url_q.get_nowait()
+                data = plot_url_q.get()
                 arr, woof_detected = data
 
                 # Lights up a bar underneath the mel spectrogram that detects the bark
@@ -97,11 +97,11 @@ class SendDataThread(Thread):
                 # response.content_type = 'application/json'
                 # socketio.emit('newnumber', {'number': json.dumps(arr.tolist())}, namespace='/test')
                 socketio.emit('newnumber', {
-                                            'number': json.dumps(arr.tolist()),
-                                            'woof': w_d
-                                            }, namespace='/test')
+                    'number': json.dumps(arr.tolist()),
+                    'woof': w_d
+                }, namespace='/test')
                 print("emit")
-            except queue.Empty:
+            except queue.Empty as e:
                 pass
 
     def run(self):
@@ -115,7 +115,7 @@ def test_connect():
     print('Client connected')
 
     # Start the random number generator thread only if the thread has not been started before.
-    # Catches exception for PYTHON 3.9 "_" added 
+    # Catches exception for PYTHON 3.9 "_" added in Is_alive
     try:
         if not thread.isAlive():
             print("Starting Thread")
@@ -132,8 +132,6 @@ def scale_minmax(X, min=0.0, max=1.0):
     X_std = (X - X.min()) / (X.max() - X.min())
     X_scaled = X_std * (max - min) + min
     return X_scaled
-
-
 
 
 ###########################################################################
@@ -278,6 +276,7 @@ def save_audio(data, name):
 
     flag_save = True
 
+
 def thread_play_woof(generate):
     global woof_count
     print("dog was heard")
@@ -298,9 +297,12 @@ def thread_play_woof(generate):
 
 ###############################################################################
 # main callback funtion for the stream : This is done in new thread per sounddevice
-# NOTE: that variable woof = 0 is needed to set woof prediction to false, this is so that you can disable playback of dog bark if too many barks happend 
+# NOTE: that variable woof = 0 is needed to set woof prediction to false, this is so that you can disable playback of dog bark if too many barks happend
 
-tok_tok = 0 
+
+tok_tok = 0
+
+
 def callback(indata, frames, _, status, woof=False):
     global woof_count
     global save_buff
@@ -318,15 +320,15 @@ def callback(indata, frames, _, status, woof=False):
         else:
             # Save buffer keeps previous buffers sound to be able to join to together with present to\
             # dog bark if it happened inbeween buffer frames.
-            # SAVEBUFF + indata 
-            # [......|||] + [|||||||] = .5 Last Seconds + .9 Second  
-
+            # SAVEBUFF + indata
+            #                [......|||] + [|||||||] = .5 Last Seconds + .9 Second
+            # Time goes from left ----- > right
             # save_buff is generic buffer that can be used to pass audio to save function to save a full clip
             save_buff = np.concatenate((save_buff[-int(RATE*.5):], np.squeeze(indata)))
             # Takes the end of the buffer for most recent audio from general buffer
             buff = save_buff[-int(RATE*(BUFFER_SECONDS+BUFFER_ADD)):]
 
-            # //To be deleted
+            # //To be deleted que should always fill but barking should be turned off
             # Que stops beeing filled if a bark is heard, this is disabled, que is always filled
             if put_in_queue == True:
                 p.put(np.squeeze(indata))
@@ -336,7 +338,7 @@ def callback(indata, frames, _, status, woof=False):
             if indata_loudness < loud_threshold:
                 print("inside silence reign:", "Listening to buffer",
                       frames, "samples", "Loudness:", indata_loudness)
-                plot_url_q.put([np.zeros((77,96)), 0])
+                plot_url_q.put([np.zeros((77, 96)), 0])
 
             else:
                 # woof get sets to "True" if woof is heard
@@ -365,46 +367,6 @@ def callback(indata, frames, _, status, woof=False):
 
 
 #Loop Start #########################################################################
-
-    # else:
-    #     fig = Figure()
-    #     ax = fig.subplots()
-
-    #     ax.specgram(arr, NFFT=512, Fs=22050)
-
-    #     buf = io.BytesIO()
-    #     fig.savefig(buf, format="jpeg")
-    #     encoded_img_data = base64.b64encode(buf.getbuffer())
-    #     return render_template("index.html", img_data=encoded_img_data.decode('utf-8'), woof_detected=w_d)
-
-
-# @app.route('/image_data')
-# def image():
-#     # my numpy array
-#     arr = plot_url_q.get()
-
-#     # convert numpy array to PIL Image
-#     img = Image.fromarray(arr.astype('uint8'))
-
-#     # create file-object in memory
-#     file_object = io.BytesIO()
-
-#     # write PNG in file-object
-#     img.save(file_object, 'PNG')
-
-#     # move to beginning of file so `send_file()` it will read from start
-#     file_object.seek(0)
-
-#     return send_file(file_object, mimetype='image/PNG')
-
-#     # if queue1.empty():
-#     #     pass
-#     # data = plot_url_q.get()
-#     # img_data = encoded_img_data = base64.b64encode(data.getvalue())
-#     # img_data=base64.b64encode(data.getvalue().decode('utf8'))
-#     # return render_template("index.html", img_data=img_data)
-
-
 def main_stream():
     try:
         with sd.InputStream(device=dev_mic,
@@ -419,10 +381,9 @@ def main_stream():
             input()
     except KeyboardInterrupt:
         pass
-        # parser.exit('')
+        parser.exit('')
     except Exception as e:
-        pass
-        # parser.exit(type(e).__name__ + ': ' + str(e))
+        parser.exit(type(e).__name__ + ': ' + str(e))
 
 
 if __name__ == "__main__":
@@ -435,7 +396,7 @@ if __name__ == "__main__":
     DOCKER = False  # docker tensorflow server does not work on arm65
     PLOT_SHOW = True  # shows plot for every sound that activates prediction function aka a loud sound
     SLEEP_TIME = 0  # seconds after the computer barks back, we sleep
-    # Cannot Exceed 1.1261678004 Seconds for Analysis 
+    # Cannot Exceed 1.1261678004 Seconds for Analysis
     BUFFER_SECONDS = .9  # Each buffer frame is analized by the tensorflow engine for dog prediction. this frame is counted in seconds + extra trim on the edge. Max+buffer Add = 2 seconds
     BUFFER_ADD = .226  # Seconds to add to the buffer from previous buffer for prediction, cannot exceed 2 seconds combined with BUFFER_SECONDS
     CHANNELS = 1  # Number of audio channels (left/Right/Mono) #not configurable
@@ -445,10 +406,11 @@ if __name__ == "__main__":
     REC_AFTER = 2  # NUmber x Buffer_seconds to record after the event has occured
     BARK_ENCODING = np.array([[-3.0, -1.6774293,  0.5526688,  7.012168, -2.2925243,
                                5.7915726,  -1.7413237,  3.5634975, -3.0460133,  -3.57509345]],
-                             dtype=np.float32) # Bark encoding gotten from the real dog file as a basis for generating new barks
+                             dtype=np.float32)  # Bark encoding gotten from the real dog file as a basis for generating new barks
     WEB = True  # Sets state if to fun Flask Server
-    PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256) # slice of MEL spectrogram to send to web server that represents current time frame 256 is hop size from check_woof.py  
-    
+    # slice of MEL spectrogram to send to web server that represents current time frame 256 is hop size from check_woof.py
+    PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256)
+
     INTERPRETER_DIR = "woof_friend_final.tflite"
     VAE_LITE_MODEL_DIR = "vae_model_decoder_tflite.tflite"
     GAN_LITE_MODEL_DIR = "gan_model_tflite.tflite"
@@ -456,13 +418,9 @@ if __name__ == "__main__":
     save_name = 0  # Used for saving waves files # Not sued currently
     save_buff = np.array([])
     woof_count = 0  # Initialize count for dog barks
-    # p = queue.Queue(1)
-    # data_que = queue.Queue(5)
-    # plot_url_q = queue.Queue(3) # que flask server to send to website
-
-    p = Queue(1)
-    data_que = Queue(5)
-    plot_url_q = Queue(3) # que flask server to send to website
+    p = queue.Queue(1)
+    data_que = queue.Queue(5)
+    plot_url_q = queue.Queue(3) # que flask server to send to website
     put_in_queue = False  # Indicates if que recording, it gets desabled during audio save, and enabled again after
     # Indicates if a save process is running not to duplicate the sounds (queue management)
     flag_save = True
@@ -484,8 +442,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print(f"Dogtor AI version {VERSION} initializing...")
-    print("output values may be rounded")
 
+
+    # Debug settings 
+    args.LOUDNESS = 0.01
     # Set Recording Device
     devices = sd.query_devices()
     print(devices)
@@ -510,15 +470,10 @@ if __name__ == "__main__":
     vae_lite_model = load_lite_model(VAE_LITE_MODEL_DIR)
     gan_lite_model = load_lite_model(GAN_LITE_MODEL_DIR)
 
-    # app.run()  # runs Flask
-    # main_thread = Thread(target=main_stream)
-    # main_thread.start()
-    p_main = Process(target=main_stream)
-    p_main.start()
-    # socketio.start_background_task(main_stream)
+
+    socketio.start_background_task(main_stream)
     print("Starting Socket")
-    if WEB:
-       socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000)
 
 
 # needs to be exported to alternate module
