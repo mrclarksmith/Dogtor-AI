@@ -45,7 +45,8 @@ from PIL import Image
 import io
 
 from flask import Flask
-# os.chdir(sys.path[0])
+
+print("[CURRENT WORKING DIRECTORY] ", os.getcwd())
 
 ##############################################################################
 app = Flask(__name__)
@@ -100,7 +101,7 @@ class SendDataThread(Thread):
                     'woof': w_d
                 }, namespace='/test')
                 print("emit")
-            except queue.Empty as e:
+            except queue.Empty:
                 pass
 
     def run(self):
@@ -329,6 +330,7 @@ def callback(indata, frames, _, status, woof=False):
             # //To be deleted que should always fill but barking should be turned off
             # Que stops beeing filled if a bark is heard, this is disabled, que is always filled
             if put_in_queue == True:
+
                 p.put(np.squeeze(indata))
 
             # only triggers Tensorflow if there is loud bark / audio
@@ -338,7 +340,8 @@ def callback(indata, frames, _, status, woof=False):
             if indata_loudness < loud_threshold:
                 print("inside silence reign:", "Listening to buffer",
                       frames, "samples", "Loudness:", indata_loudness)
-                plot_url_q.put([np.zeros((77, 96)), 0])
+                if args.WEB_FLASK == 1:
+                    plot_url_q.put([np.zeros((77, 96)), 0])
 
             else:
                 # woof get sets to "True" if woof is heard
@@ -349,8 +352,8 @@ def callback(indata, frames, _, status, woof=False):
                 # put "data" from prediction in que trimmed for current frame of audio
                 #print(len(indata), buff.shape, data.shape)
                 # Cuts off Extra buffer to make the audio seamless
-
-                plot_url_q.put([data.T[:77], woof])
+                if args.WEB_FLASK == 1:
+                    plot_url_q.put([data.T[:77], woof])
                 if (prediction > .70) and (SAVEAUDIO is True) and (flag_save == True):
                     put_in_queue = True
                     flag_save = False
@@ -407,7 +410,7 @@ if __name__ == "__main__":
     BARK_ENCODING = np.array([[-3.0, -1.6774293,  0.5526688,  7.012168, -2.2925243,
                                5.7915726,  -1.7413237,  3.5634975, -3.0460133,  -3.57509345]],
                              dtype=np.float32)  # Bark encoding gotten from the real dog file as a basis for generating new barks
-    WEB = True  # Sets state if to fun Flask Server
+    # WEB = True  # Sets state if to fun Flask Server
     # slice of MEL spectrogram to send to web server that represents current time frame 256 is hop size from check_woof.py
     PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256) # SR * Buffer /  HOp length
 
@@ -437,7 +440,7 @@ if __name__ == "__main__":
     parser.add_argument('--CONFIDENCE', dest='CONFIDENCE', type=float)
     parser.add_argument('--MIC', dest='MIC', type=str)
     parser.add_argument('--LOUDNESS', dest='LOUDNESS', type=float)
-    parser.add_argument('--WEB', dest='WEB', type=bool)
+    parser.add_argument('--WEB_FLASK', dest='WEB_FLASK', type=int)
 
     args = parser.parse_args()
 
@@ -445,7 +448,6 @@ if __name__ == "__main__":
 
 
     # Debug settings 
-    args.LOUDNESS = 0.01
     # Set Recording Device
     devices = sd.query_devices()
     print(devices)
@@ -455,6 +457,7 @@ if __name__ == "__main__":
         dev_mic = int(dev_mic)
         print("Mic selected:", dev_mic)
     else:
+        dev_mic = int(args.MIC)
         print("Mic was entered at run time")
 
     if args.LOUDNESS is None:
@@ -470,10 +473,11 @@ if __name__ == "__main__":
     vae_lite_model = load_lite_model(VAE_LITE_MODEL_DIR)
     gan_lite_model = load_lite_model(GAN_LITE_MODEL_DIR)
 
-
+    print("Starting Socket", args.WEB_FLASK)
     socketio.start_background_task(main_stream)
-    print("Starting Socket")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+
+    if int(args.WEB_FLASK) == 1:
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 
 # needs to be exported to alternate module
