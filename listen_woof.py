@@ -45,8 +45,7 @@ from PIL import Image
 import io
 
 from flask import Flask
-from matplotlib.figure import Figure
-os.chdir(sys.path[0])
+# os.chdir(sys.path[0])
 
 ##############################################################################
 app = Flask(__name__)
@@ -302,7 +301,6 @@ def thread_play_woof(generate):
 
 tok_tok = 0
 
-
 def callback(indata, frames, _, status, woof=False):
     global woof_count
     global save_buff
@@ -335,6 +333,8 @@ def callback(indata, frames, _, status, woof=False):
 
             # only triggers Tensorflow if there is loud bark / audio
             indata_loudness = round(max(np.abs(indata))[0], 4)
+            print(time.time()-tok_tok)
+            tok_tok = time.time()
             if indata_loudness < loud_threshold:
                 print("inside silence reign:", "Listening to buffer",
                       frames, "samples", "Loudness:", indata_loudness)
@@ -409,7 +409,7 @@ if __name__ == "__main__":
                              dtype=np.float32)  # Bark encoding gotten from the real dog file as a basis for generating new barks
     WEB = True  # Sets state if to fun Flask Server
     # slice of MEL spectrogram to send to web server that represents current time frame 256 is hop size from check_woof.py
-    PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256)
+    PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256) # SR * Buffer /  HOp length
 
     INTERPRETER_DIR = "woof_friend_final.tflite"
     VAE_LITE_MODEL_DIR = "vae_model_decoder_tflite.tflite"
@@ -473,7 +473,7 @@ if __name__ == "__main__":
 
     socketio.start_background_task(main_stream)
     print("Starting Socket")
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
 
 
 # needs to be exported to alternate module
