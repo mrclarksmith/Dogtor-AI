@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.8.0/chart.min.js" integrity="sha512-sW/w8s4RWTdFFSduOTGtk4isV1+190E/GghVffMA9XczdJ2MDzSzLEubKAs5h0wzgSJOQTRYyaz73L3d6RtJSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.6.1/d3.min.js" integrity="sha512-MefNfAGJ/pEy89xLOFs3V6pYPs6AmUhXJrRlydI/9wZuGrqxmrdQ80zKHUcyadAcpH67teDZcBeS6oMJLPtTqw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datasource@0.1.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" integrity="sha512-UXumZrZNiOwnTcZSHLOfcTs0aos2MzBWHXOHOuB0J/R44QB0dwY5JgfbvljXcklVf65Gc4El6RjZ+lnwd2az2g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/1.2.1/chartjs-plugin-zoom.min.js" integrity="sha512-klQv6lz2YR+MecyFYMFRuU2eAl8IPRo6zHnsc9n142TJuJHS8CG0ix4Oq9na9ceeg1u5EkBfZsFcV3U7J51iew==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+<script>
+window.onload = function() {
+
+    labels_data = [
+                1657853354,
+                1657853385,
+                1657853386,
+                1657853387,
+                1657853388,
+                1657853389,
+                1657853390,
+                1657853391,
+                1657853392,
+                1657853393,
+                1657853393,
+                1657853394,
+                1657853395,
+                1657853513,
+                1657853514,
+                1657853515,
+                1657853516,
+                1657853517,
+                1657853518,
+                1657853520,
+                1657853525,
+                1657853547,
+                1657853548,
+                1657853548,
+                1657853549,
+                1657853603,
+                1657853604,
+                1657853605,
+                1657853625,
+                1657853626,
+                1657853627,
+                1657853628,
+                1657853629,
+                1657853630,
+                1657853633,
+                1657853634,
+                1657959835].map(function(x) {return x*1000;})
+               console.log(labels_data)
+    var ctx = document.getElementById('myChart');
+    const myChart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            labels: labels_data,
+            datasets: [{
+                label: '# of Votes',
+                data: [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                    'rgba(255, 159, 64, 0.2)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+              x: {
+                type: 'time',
+                time: {
+                    //unit: 'second',
+                    minUnit: 'second',
+                    autoSkip: true,
+                    //autoSkipPadding: 50,
+                    stepSize: 1,
+                    displayFormats: {'second' : 'MMM dd hh:mm:ss'}
+                  }
+                },
+                y: {
+                    display: false,
+                    ticks: {
+                        max: 1.1,
+                        min: 0.9,
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                zoom: {
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                    },
+                    pinch: {
+                        enabled: true
+                    },
+                    mode: 'x',
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
+                    }
+
+                }    
+            }
+        }
+    });
+
+}
+
+</script>
+
+
+</head>
+<div>
+    <canvas id="myChart" width="400" height="100"></canvas>
+  </div>
+</html>

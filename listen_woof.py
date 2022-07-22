@@ -25,16 +25,15 @@ from threading import Thread, Event
 from pathlib import Path
 import tensorflow as tf
 import time
-import librosa
 import librosa.display
 # from multiprocessing import Process
 # from multiprocessing import Queue
 # importing custom python module
 from check_woof import predict
-from scipy.signal import hilbert
 
 
-from flask import Flask, render_template, url_for, request, redirect, make_response, Response, send_file, jsonify
+
+from flask import Flask, render_template, url_for, request, redirect, make_response, Response, send_file, jsonify, send_from_directory
 import json
 import random
 
@@ -43,8 +42,8 @@ from io import BytesIO
 from flask import Flask, render_template
 from PIL import Image
 import io
-
-from flask import Flask
+import csv
+import pandas as pd
 
 print("[CURRENT WORKING DIRECTORY] ", os.getcwd())
 
@@ -53,11 +52,12 @@ app = Flask(__name__)
 socketio = SocketIO(app)
 thread = Thread()
 thread_stop_event = Event()
-
+app.config['TESTING'] = True
 
 @app.route('/', methods=["GET", "POST"])
 def index():
     return render_template('index.html')
+
 
 
 @socketio.on('my event')                          # Decorator to catch an event called "my event":
@@ -65,9 +65,16 @@ def test_message(message):                        # test_message() is the event 
     emit('my response', {'data': 'got it!'})      # Trigger a new event called "my response"
     # that can be caught by another callback later in the program.
 
+
+@app.route('/dog_bark.csv', methods=['GET','POST'])
+def dog_bark_csv():
+    print("sending file")
+    return send_from_directory('log_data', "dog_log.csv")
+
+
+
+
 # Thread Class to send data to Local Server to view spectorgrams
-
-
 class SendDataThread(Thread):
     def __init__(self):
         super(SendDataThread, self).__init__()
@@ -133,6 +140,32 @@ def scale_minmax(X, min=0.0, max=1.0):
     X_scaled = X_std * (max - min) + min
     return X_scaled
 
+
+def write_to_csv(bark, bark_response): 
+    '''
+    input: bool, bool
+    '''
+    # Record into CSV file date and time dogs bark and if response dog bark was played back
+    if (bark == 1)  or (bark_response == 1):
+        try:
+            with open(LOG_DATA_DIR, 'a', newline='') as file:
+                writer =  csv.writer(file)
+                writer.writerow([time.time(), bark, bark_response])
+        except Exception as e:
+            print(e)
+
+def init_csv_file():
+    '''
+    input: str
+    Creates A csv file with proper headers 
+    '''
+    #check if file exists
+    if not os.path.exists(LOG_DATA_DIR):
+        with open(LOG_DATA_DIR, 'w', newline='' ) as file:
+            writer =  csv.writer(file)
+            writer.writerow(["Time", "Dog_bark", "Bark_back"])
+
+        
 
 ###########################################################################
 # darwin = macOS, win32 = Windows
@@ -330,7 +363,6 @@ def callback(indata, frames, _, status, woof=False):
             # //To be deleted que should always fill but barking should be turned off
             # Que stops beeing filled if a bark is heard, this is disabled, que is always filled
             if put_in_queue == True:
-
                 p.put(np.squeeze(indata))
 
             # only triggers Tensorflow if there is loud bark / audio
@@ -340,7 +372,7 @@ def callback(indata, frames, _, status, woof=False):
             if indata_loudness < loud_threshold:
                 print("inside silence reign:", "Listening to buffer",
                       frames, "samples", "Loudness:", indata_loudness)
-                if args.WEB_FLASK == 1:
+                if WEB_FLASK == 1:
                     plot_url_q.put([np.zeros((77, 96)), 0])
 
             else:
@@ -349,20 +381,23 @@ def callback(indata, frames, _, status, woof=False):
                     buff[np.newaxis, :], interpreter, confidence=CONFIDENCE, additional_data=True)
                 print("Predictions: score:", prediction, "Loudness:",
                       indata_loudness, "/", loud_threshold)
-                # put "data" from prediction in que trimmed for current frame of audio
-                #print(len(indata), buff.shape, data.shape)
-                # Cuts off Extra buffer to make the audio seamless
-                if args.WEB_FLASK == 1:
+
+                
+                print(WEB_FLASK, "FLASK WEB")
+                if WEB_FLASK == 1:
+                    # put "data" from prediction in que trimmed for current frame of audio      
+                    # data is sliced to cut Extra buffer data to make the audio seamless
                     plot_url_q.put([data.T[:77], woof])
-                if (prediction > .70) and (SAVEAUDIO is True) and (flag_save == True):
+                if (woof) and (SAVEAUDIO is True) and (flag_save==True):
                     put_in_queue = True
                     flag_save = False
                     save_thread = Thread(target=save_audio, args=(
                         save_buff, f"_P{round(prediction,4)}L{max(np.abs(indata))}"))
                     save_thread.start()
                 if woof:
-                    th_w = Thread(target=thread_play_woof, args=[True])  # arg:generate = True
+                    th_w = Thread(target=thread_play_woof, args=[True])  # arg:generate = True #TODO this needs to be coded into the args
                     th_w.start()
+                    write_to_csv(1, int(SAVEAUDIO))
     else:
         print('no input')
 
@@ -370,7 +405,7 @@ def callback(indata, frames, _, status, woof=False):
 
 
 #Loop Start #########################################################################
-def main_stream():
+def main_stream(WEB_FLASK):
     try:
         with sd.InputStream(device=dev_mic,
                             channels=1,
@@ -414,6 +449,8 @@ if __name__ == "__main__":
     # slice of MEL spectrogram to send to web server that represents current time frame 256 is hop size from check_woof.py
     PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256) # SR * Buffer /  HOp length
 
+    WEB_FLASK = 1
+    LOG_DATA_DIR = './log_data/dog_log.csv'
     INTERPRETER_DIR = "woof_friend_final.tflite"
     VAE_LITE_MODEL_DIR = "vae_model_decoder_tflite.tflite"
     GAN_LITE_MODEL_DIR = "gan_model_tflite.tflite"
@@ -472,12 +509,15 @@ if __name__ == "__main__":
     interpreter = load_lite_model(INTERPRETER_DIR)
     vae_lite_model = load_lite_model(VAE_LITE_MODEL_DIR)
     gan_lite_model = load_lite_model(GAN_LITE_MODEL_DIR)
+    
+    # Initialize logger csv file
+    init_csv_file()
 
-    print("Starting Socket", args.WEB_FLASK)
-    socketio.start_background_task(main_stream)
+    print("Starting Socket", WEB_FLASK)
+    socketio.start_background_task(main_stream, WEB_FLASK)
 
-    if int(args.WEB_FLASK) == 1:
-        socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    if int(WEB_FLASK) == 1:
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False, )
 
 
 # needs to be exported to alternate module

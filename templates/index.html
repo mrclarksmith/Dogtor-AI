@@ -7,7 +7,17 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css">
   <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
-  <style type="text/css">html, 
+
+  
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.8.0/chart.min.js" integrity="sha512-sW/w8s4RWTdFFSduOTGtk4isV1+190E/GghVffMA9XczdJ2MDzSzLEubKAs5h0wzgSJOQTRYyaz73L3d6RtJSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.6.1/d3.min.js" integrity="sha512-MefNfAGJ/pEy89xLOFs3V6pYPs6AmUhXJrRlydI/9wZuGrqxmrdQ80zKHUcyadAcpH67teDZcBeS6oMJLPtTqw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datasource@0.1.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" integrity="sha512-UXumZrZNiOwnTcZSHLOfcTs0aos2MzBWHXOHOuB0J/R44QB0dwY5JgfbvljXcklVf65Gc4El6RjZ+lnwd2az2g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/1.2.1/chartjs-plugin-zoom.min.js" integrity="sha512-klQv6lz2YR+MecyFYMFRuU2eAl8IPRo6zHnsc9n142TJuJHS8CG0ix4Oq9na9ceeg1u5EkBfZsFcV3U7J51iew==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <style type="text/css">
   body {
     height: 100%;
   }
@@ -62,7 +72,7 @@ function initialize() {
     } else {
       dog_hue = 200;
     }
-    console.log("[HUE]" + dog_hue +  " " + DATA )
+    //console.log("[HUE]" + dog_hue +  " " + DATA )
     dog_CTX.fillStyle =`hsl(${dog_hue}, 100%, 50%)`;
     dog_CTX.fillRect(dog_x, 0, lengthMultiplier * bufferLength, dog_H);
     dog_CTX.stroke();
@@ -83,9 +93,8 @@ function initialize() {
 
   function draw_fft(DATA) {   
       let imgData = CTX.getImageData(lengthMultiplier , 0, W - 1* lengthMultiplier, H);
-      // console.log("[DATA]", DATA)
+      //console.log("[DATA]", DATA)
       const LEN = DATA.length;
-      //CTX.fillRect(0, 0, W, H);
       CTX.putImageData(imgData, 0, 0);       
       for (let i = 0; i < LEN; i++) {
         let rat = DATA[i] ;
@@ -94,10 +103,7 @@ function initialize() {
         let lit = 10 + 70 * rat + '%';
         CTX.beginPath();
         CTX.fillStyle =`hsl(${hue}, ${sat}, ${lit})`;
-        //CTX.strokeStyle = `hsl(${hue}, ${sat}, ${lit})`;
         CTX.fillRect(x_1, H - i * h, lengthMultiplier, h);
-        //CTX.moveTo(x, H - i * h);
-        //CTX.lineTo(x_1, H - (i * h + h));
         CTX.stroke();
         
       }
@@ -113,9 +119,9 @@ function initialize() {
     //receive details from server
     socket.on('newnumber', function(chunk) {
         var data = JSON.parse(chunk.number);
-
+        //console.log('[DATA]' + data)
         var dog_detec = chunk.woof;
-        console.log(dog_detec);
+        //console.log(dog_detec);
         woof_indicator(dog_detec);
         for ( var i = 0; i < bufferLength; i++) {
           draw_fft(data[i]);
@@ -135,11 +141,100 @@ function initialize() {
   });
 
 
+  //time graph
+  const chartData = "/dog_bark.csv"
+  // parse the file from csv to jason
+  d3.csv(chartData).then(function(datapoints) {
+    console.log(datapoints);
+    var timestamps = [];
+    const dog_barks = [];
+    
+    for (i = 0; i < datapoints.length; i++) {
+      timestamps.push(datapoints[i].Time)
+      dog_barks.push(datapoints[i].Dog_bark)
+    }
+    console.log(dog_barks)
+
+    const timestamps_second = timestamps.map(function(x) {return x*1000})
+    console.log(timestamps_second)
+    const ctx = document.getElementById('myChart');
+    const myChart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            labels: timestamps_second,
+            datasets: [{
+                label: 'Dog Bark Activation',
+                data: dog_barks,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                    'rgba(255, 159, 64, 0.2)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+              x: {
+                type: 'time',
+                time: {
+                    //unit: 'second',
+                    minUnit: 'second',
+                    autoSkip: true,
+                    //autoSkipPadding: 50,
+                    stepSize: 1,
+                    displayFormats: {'second': 'MMM dd hh:mm'}
+                  }
+                },
+                y: {
+                    display: false,
+                    ticks: {
+                        max: 1.1,
+                        min: 0.9,
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                zoom: {
+                    zoom: {
+                        wheel: {
+                            enabled: true,
+                    },
+                    pinch: {
+                        enabled: true
+                    },
+                    mode: 'x',
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
+                    }
+
+                }    
+            }
+        }
+    });
+
+  });
+
+
 }
 
-
-
 </script>
+
+
 </head>
 <body>
 <!-- partial:index.partial.html -->
@@ -164,6 +259,9 @@ function initialize() {
         <p></p>
         <h3>Number list:</h3>
         <div id="log"> </div> <!-- /#log -->
+    </div>
+    <div>
+      <canvas id="myChart" style="width:100%;height:150px">chart goes here</canvas>
     </div>
 </h2>
 
