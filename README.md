@@ -66,7 +66,7 @@ Sound was then listend to and any small dogs or wining pet sounds that didn't so
 Total Dog files: 3,023.
 
 Additionally for image classification trainig all but the dog sounds from the urbansound8k dataset were used.
-During training for each epoch the audio files were randomly trimmed to training length. 
+During training for each epoch the audio files were randomly trimmed to training length.
 Total Non Dog files: 7,732.
 
 
