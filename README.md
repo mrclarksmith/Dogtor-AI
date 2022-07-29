@@ -35,23 +35,28 @@ pip install -r requirements.txt
 python listen_woof.py # starts the the program and flask web server
 For dashboard visit http://127.0.0.1:5000/ 
 
-## Description of code. 
+##  1. Description of code. 
 
 ### 1. Dog Bark idenfication
 The processing of audio and detection happens inside check_woof.py file. 
 Audio is captured and concatonated with .12 seconds of audio from previous recorded audio sample. This is done so audio bark is not split by the capture segment. Audio then is preproccessed then Image as classfied as dog or not dog score of 0 to 1  using BiT-M R101x1 model (https://tfhub.dev/google/bit/m-r101x1/ilsvrc2012_classification/1) with custom last layer of single output. 
 
-The Diagram shows the program flow:
+### 2. The diagram shows the high level program flow and comnponents:
 
 ![Untitled Diagram drawio](https://user-images.githubusercontent.com/85537933/181687285-7e8fcf16-184e-4234-b384-18006418ef5a.png)
 
+### 3. Image Classifier
 ![Image_classfier_model drawio](https://user-images.githubusercontent.com/85537933/181688253-36f4db77-0b63-40dc-b6e2-79474a9f96d7.png)
 
-VAE neural network architecture coded following 'The Sound of AI' Youtube tutorial series by Valerio Velardo but modified for multiple TF modles loaded at the same time
+### 4. VAE neural network architecture coded following 'The Sound of AI' Youtube tutorial series by Valerio Velardo but modified for multiple TF modles loaded at the same time
 
 ![VAE_MEL_model drawio](https://user-images.githubusercontent.com/85537933/181694615-0d19abb4-3b9e-43c3-b964-65eb6662080f.png)
 
-## 3. Data Sets:
+### 5. For Mel diagram to audio generation MelGAn was used
+![MelGan](https://user-images.githubusercontent.com/85537933/181822016-58b68193-ff72-4eb0-be7f-0036c37a62a3.png)
+source: https://github.com/seungwonpark/melgan
+
+## 2. Data Sets:
 Custom dog audio dataset was created from:
 -1000 dog barsk from urbansound8k dataset
 -60 hours of recorded audio barks 
@@ -63,6 +68,8 @@ Total Dog files: 3,023.
 Additionally for image classification trainig all but the dog sounds from the urbansound8k dataset were used.
 During training for each epoch the audio files were randomly trimmed to training length. 
 Total Non Dog files: 7,732.
+
+
 
 
 
