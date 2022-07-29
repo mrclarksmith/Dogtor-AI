@@ -45,3 +45,6 @@ Audio is captured and concatonated with .12 seconds of audio from previous recor
 
 ![Image_classfier_model drawio](https://user-images.githubusercontent.com/85537933/181688253-36f4db77-0b63-40dc-b6e2-79474a9f96d7.png)
 
+VAE neural network architecture coded following 'The Sound of AI' Youtube tutorial series by Valerio Velardo but modified for multiple TF modles loaded at the same time
+
+
