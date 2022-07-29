@@ -43,4 +43,5 @@ Audio is captured and concatonated with .12 seconds of audio from previous recor
 
 ![Untitled Diagram drawio](https://user-images.githubusercontent.com/85537933/181687285-7e8fcf16-184e-4234-b384-18006418ef5a.png)
 
+![Image_classfier_model drawio](https://user-images.githubusercontent.com/85537933/181688253-36f4db77-0b63-40dc-b6e2-79474a9f96d7.png)
 
