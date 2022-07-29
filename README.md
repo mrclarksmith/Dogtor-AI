@@ -39,7 +39,9 @@ For dashboard visit http://127.0.0.1:5000/
 
 ### 1. Dog Bark idenfication
 The processing of audio and detection happens inside check_woof.py file. 
-Audio is captured and concatonated with .12 seconds of audio from previous recorded audio sample. This is done so audio bark is not split by the capture segment. Audio then is preproccessed then Image as classfied as dog or not dog score of 0 to 1  using BiT-M R101x1 model (https://tfhub.dev/google/bit/m-r101x1/ilsvrc2012_classification/1) with custom last layer of single output
+Audio is captured and concatonated with .12 seconds of audio from previous recorded audio sample. This is done so audio bark is not split by the capture segment. Audio then is preproccessed then Image as classfied as dog or not dog score of 0 to 1  using BiT-M R101x1 model (https://tfhub.dev/google/bit/m-r101x1/ilsvrc2012_classification/1) with custom last layer of single output. 
+
+The Diagram shows the program flow:
 
 ![Untitled Diagram drawio](https://user-images.githubusercontent.com/85537933/181687285-7e8fcf16-184e-4234-b384-18006418ef5a.png)
 
@@ -48,4 +50,21 @@ Audio is captured and concatonated with .12 seconds of audio from previous recor
 VAE neural network architecture coded following 'The Sound of AI' Youtube tutorial series by Valerio Velardo but modified for multiple TF modles loaded at the same time
 
 ![VAE_MEL_model drawio](https://user-images.githubusercontent.com/85537933/181694615-0d19abb4-3b9e-43c3-b964-65eb6662080f.png)
+
+## 3. Data Sets:
+Custom dog audio dataset was created from:
+-1000 dog barsk from urbansound8k dataset
+-60 hours of recorded audio barks 
+-PetDogSoundEvent_Barking
+Each bark audio file was split into multipe files with scilence removed. 
+Sound was then listend to and any small dogs or wining pet sounds that didn't sound like a big dog or had too much background noise were removed. 
+Total Dog files: 3,023.
+
+Additionally for image classification trainig all but the dog sounds from the urbansound8k dataset were used.
+During training for each epoch the audio files were randomly trimmed to training length. 
+Total Non Dog files: 7,732.
+
+
+
+
 
