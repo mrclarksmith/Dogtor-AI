@@ -41,4 +41,6 @@ For dashboard visit http://127.0.0.1:5000/
 The processing of audio and detection happens inside check_woof.py file. 
 Audio is captured and concatonated with .12 seconds of audio from previous recorded audio sample. This is done so audio bark is not split by the capture segment. Audio then is preproccessed then Image as classfied as dog or not dog score of 0 to 1  using BiT-M R101x1 model (https://tfhub.dev/google/bit/m-r101x1/ilsvrc2012_classification/1) with custom last layer of single output
 
+![Untitled Diagram drawio](https://user-images.githubusercontent.com/85537933/181687285-7e8fcf16-184e-4234-b384-18006418ef5a.png)
+
 
