@@ -62,7 +62,7 @@ module = hub.KerasLayer(model_path)
 class New_model(tf.keras.Model):
     def __init__(self, module, frame_height, frame_length):
         super().__init__()
-        self.pre2d =tf.keras.layers.Conv2D(3,(3,3),padding='same', name= "pre2d")
+        self.pre2d =tf.keras.layers.Conv2D(3,(3,3),padding='same', name= "pre2d") # TODO created to create 3 layers for different colors this needs to be a static function 
         self.dense1 = tf.keras.layers.Dense(512, activation = 'relu', name = 'dense1')
         self.dense2 = tf.keras.layers.Dense(256, activation = 'relu', name = 'dense2')
         self.head =  tf.keras.layers.Dense(1, activation ='sigmoid')

@@ -2,7 +2,7 @@
 <html lang="en" >
 <head>
   <meta charset="UTF-8">
-  <title>CodePen - Web Audio Visualizer 01: Spectrogram</title>
+  <title>Dogtor AI - Dog bark detector, and dog bark synthesizer.</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css">
@@ -21,15 +21,35 @@
   body {
     height: 100%;
   }
-
   
-  h1 {
+  h2 {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     margin: 0;
   }
+
+  div.hidden
+{
+   display: none
+}
+.head1 { 
+height: 125px;
+float: left;
+  background: #adb9ff;
+  color: white;
+  font-size: 30px;
+}
+.head2 { 
+height: 125px;
+
+  background: #adb9ff;
+  color: white;
+  font-size: 30px;
+}
+
+
   </style>
 
 <script>
@@ -47,7 +67,8 @@ window.addEventListener('click', () => {
 
 
 function initialize() {
-  document.body.querySelector('h1').remove();
+  document.body.querySelector('h2').remove();
+  $("div#extraControls").removeClass("hidden");
   const bufferHeight = 96;
   const bufferLength = 77;
   const lengthMultiplier = 3; //multiplier for pixels of MEL spectogram aka how wide it is
@@ -127,7 +148,7 @@ function initialize() {
           draw_fft(data[i]);
         };
 
-        //maintain a list of ten numbers
+        //maintain a list of Dog activated barks
         // if (numbers_received.length >= 10){
         //     numbers_received.shift()
         // }
@@ -238,34 +259,43 @@ function initialize() {
 </head>
 <body>
 <!-- partial:index.partial.html -->
-<h1>Click to start</h1>
+<h2>Click to start</h2>
 
-<h2>
-<div>
-  <h3>DoGtor AI</h3>
-  <p>Live MEL spectrogram view from machine running the analysis.</p>
-  <p>Server analyses data in 1second intervals and pushes data to preview here</p>
-  <p>Each frame appears discontinus due to normalization done on each analyis frame [ fraction Seconds of Previous + Current Frame ]</p>
+<div class="header">
+  <div class="head1">
+    <p>AUTONOMOUS DOG DETECTION AND BARKING DASHBOARD</p>
+  </div> 
+  <div class="head2"> 
+    <img src="/static/Dogtor_ai_logo.png" width="256" height="115" alt="dogtor_ai" class="floatRightIcon">
+  </div>
+
+</div>
+
+
+
+<div id="extraControls" class="hidden">
+  <div>
+  <p>Live MEL spectrogram view from machine running the analysis.
+  Server analyses data in 1second intervals and pushes data to preview here.
+  Each frame appears discontinus due to normalization done on each analyis frame [ fraction Seconds of Previous + Current Frame ]</p>
 </div>
 </h2>
 <!-- partial -->
 <canvas id="canvas_mel" >canvas_mel</canvas>
 <canvas id="dog_detected">dog_detected</canvas> 
-<p>Red bar at the bottom means a dog was heard</p>
-<h2>
+<p>Dog Activation bar</p>
+
 <div class="container" id="content">
-    <div class="row">
 
-        <p></p>
-        <h3>Number list:</h3>
-        <div id="log"> </div> <!-- /#log -->
-    </div>
     <div>
-      <canvas id="myChart" style="width:100%;height:150px">chart goes here</canvas>
+      <canvas id="myChart" style="width:100%;height:150px">Chart of Dor Barks Heard</canvas>
     </div>
-</h2>
 
-
-
+    <div class="row">
+      <p></p>
+      <h3>Latest Dog Bark Generated:</h3>
+      <div id="log"> </div> <!-- /#log -->
+  </div>
+</div>
 </body>
 </html>

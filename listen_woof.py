@@ -92,17 +92,6 @@ class SendDataThread(Thread):
                 else:
                     w_d = 0
 
-                # Send Image
-                # img =  Image.fromarray(arr.astype('uint8'))
-
-                # # create file-object in memroy
-                # file_object = io.BytesIO()
-                # #write PNG in file-object
-                # img.save(file_object, 'PNG')
-
-                # response = make_response(json.dumps(arr.tolist()))
-                # response.content_type = 'application/json'
-                # socketio.emit('newnumber', {'number': json.dumps(arr.tolist())}, namespace='/test')
                 socketio.emit('newnumber', {
                     'number': json.dumps(arr.tolist()),
                     'woof': w_d
@@ -517,7 +506,7 @@ if __name__ == "__main__":
     socketio.start_background_task(main_stream, WEB_FLASK)
 
     if int(WEB_FLASK) == 1:
-        socketio.run(app, host='0.0.0.0', port=5000, debug=False, )
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 
 # needs to be exported to alternate module
