@@ -58,9 +58,9 @@ source: https://github.com/seungwonpark/melgan
 
 ## 2. Data Sets:
 Custom dog audio dataset was created from:
--1000 dog barsk from urbansound8k dataset
--60 hours of recorded audio barks 
--PetDogSoundEvent_Barking
+- 1000 dog barsk from urbansound8k dataset
+- 60 hours of recorded audio barks 
+- PetDogSoundEvent_Barking
 Each bark audio file was split into multipe files with scilence removed. 
 Sound was then listend to and any small dogs or wining pet sounds that didn't sound like a big dog or had too much background noise were removed. 
 Total Dog files: 3,023.
