@@ -32,7 +32,6 @@ import librosa.display
 from check_woof import predict
 
 
-
 from flask import Flask, render_template, url_for, request, redirect, make_response, Response, send_file, jsonify, send_from_directory
 import json
 import random
@@ -54,10 +53,10 @@ thread = Thread()
 thread_stop_event = Event()
 app.config['TESTING'] = True
 
+
 @app.route('/', methods=["GET", "POST"])
 def index():
     return render_template('index.html')
-
 
 
 @socketio.on('my event')                          # Decorator to catch an event called "my event":
@@ -66,12 +65,26 @@ def test_message(message):                        # test_message() is the event 
     # that can be caught by another callback later in the program.
 
 
-@app.route('/dog_bark.csv', methods=['GET','POST'])
+@app.route('/dog_bark.csv', methods=['GET', 'POST'])
 def dog_bark_csv():
     print("sending file")
     return send_from_directory('log_data', "dog_log.csv")
 
 
+@app.route('/play_bark_sound', methods=['POST'])
+def play_bark_sound_request():
+    print("Recieved from client: {}".format(request.form.to_dict()))
+    bark_dict = []
+    for key in request.form.to_dict():
+        bark_dict.append(float(request.form.to_dict()[key]))
+    # input bark dimension [1,10]
+    bark_dict_np = np.array([bark_dict], dtype=np.float32)
+    print(bark_dict_np)
+    # TODO set flag if thread running to do nothing
+    th_play = Thread(target=generate_point_audio, args=[
+                     vae_lite_model, gan_lite_model, bark_dict_np, False])
+    th_play.start()
+    th_play.join()
 
 
 # Thread Class to send data to Local Server to view spectorgrams
@@ -130,31 +143,31 @@ def scale_minmax(X, min=0.0, max=1.0):
     return X_scaled
 
 
-def write_to_csv(bark, bark_response): 
+def write_to_csv(bark, bark_response):
     '''
     input: bool, bool
     '''
     # Record into CSV file date and time dogs bark and if response dog bark was played back
-    if (bark == 1)  or (bark_response == 1):
+    if (bark == 1) or (bark_response == 1):
         try:
             with open(LOG_DATA_DIR, 'a', newline='') as file:
-                writer =  csv.writer(file)
+                writer = csv.writer(file)
                 writer.writerow([time.time(), bark, bark_response])
         except Exception as e:
             print(e)
+
 
 def init_csv_file():
     '''
     input: str
     Creates A csv file with proper headers 
     '''
-    #check if file exists
+    # check if file exists
     if not os.path.exists(LOG_DATA_DIR):
-        with open(LOG_DATA_DIR, 'w', newline='' ) as file:
-            writer =  csv.writer(file)
+        with open(LOG_DATA_DIR, 'w', newline='') as file:
+            writer = csv.writer(file)
             writer.writerow(["Time", "Dog_bark", "Bark_back"])
 
-        
 
 ###########################################################################
 # darwin = macOS, win32 = Windows
@@ -192,7 +205,10 @@ def generate_point_audio(lite_model_vae_decoder,  lite_model_gan, encoding, save
 
     # Generate audio_predict
     audio_generated = run_lite_model(np.squeeze(mel_set)[np.newaxis, ...], lite_model_gan)
+    print("playing audio generated bark")
+    print(audio_generated)
     sd.play(np.squeeze(audio_generated), samplerate=RATE)
+    sd.wait()
     # save audio
     if save:
         save_audio(audio_generated, "gen_bark")
@@ -324,6 +340,7 @@ def thread_play_woof(generate):
 
 tok_tok = 0
 
+
 def callback(indata, frames, _, status, woof=False):
     global woof_count
     global save_buff
@@ -371,20 +388,20 @@ def callback(indata, frames, _, status, woof=False):
                 print("Predictions: score:", prediction, "Loudness:",
                       indata_loudness, "/", loud_threshold)
 
-                
                 print(WEB_FLASK, "FLASK WEB")
                 if WEB_FLASK == 1:
-                    # put "data" from prediction in que trimmed for current frame of audio      
+                    # put "data" from prediction in que trimmed for current frame of audio
                     # data is sliced to cut Extra buffer data to make the audio seamless
                     plot_url_q.put([data.T[:77], woof])
-                if (woof) and (SAVEAUDIO is True) and (flag_save==True):
+                if (woof) and (SAVEAUDIO is True) and (flag_save == True):
                     put_in_queue = True
                     flag_save = False
                     save_thread = Thread(target=save_audio, args=(
                         save_buff, f"_P{round(prediction,4)}L{max(np.abs(indata))}"))
                     save_thread.start()
                 if woof:
-                    th_w = Thread(target=thread_play_woof, args=[True])  # arg:generate = True #TODO this needs to be coded into the args
+                    # arg:generate = True #TODO this needs to be coded into the args
+                    th_w = Thread(target=thread_play_woof, args=[True])
                     th_w.start()
                     write_to_csv(1, int(SAVEAUDIO))
     else:
@@ -436,7 +453,7 @@ if __name__ == "__main__":
                              dtype=np.float32)  # Bark encoding gotten from the real dog file as a basis for generating new barks
     # WEB = True  # Sets state if to fun Flask Server
     # slice of MEL spectrogram to send to web server that represents current time frame 256 is hop size from check_woof.py
-    PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256) # SR * Buffer /  HOp length
+    PLOT_URL_DATA_SIZE = int(22050 * BUFFER_SECONDS / 256)  # SR * Buffer /  HOp length
 
     WEB_FLASK = 1
     LOG_DATA_DIR = './log_data/dog_log.csv'
@@ -449,7 +466,7 @@ if __name__ == "__main__":
     woof_count = 0  # Initialize count for dog barks
     p = queue.Queue(1)
     data_que = queue.Queue(5)
-    plot_url_q = queue.Queue(3) # que flask server to send to website
+    plot_url_q = queue.Queue(3)  # que flask server to send to website
     put_in_queue = False  # Indicates if que recording, it gets desabled during audio save, and enabled again after
     # Indicates if a save process is running not to duplicate the sounds (queue management)
     flag_save = True
@@ -472,8 +489,7 @@ if __name__ == "__main__":
 
     print(f"Dogtor AI version {VERSION} initializing...")
 
-
-    # Debug settings 
+    # Debug settings
     # Set Recording Device
     devices = sd.query_devices()
     print(devices)
@@ -498,7 +514,7 @@ if __name__ == "__main__":
     interpreter = load_lite_model(INTERPRETER_DIR)
     vae_lite_model = load_lite_model(VAE_LITE_MODEL_DIR)
     gan_lite_model = load_lite_model(GAN_LITE_MODEL_DIR)
-    
+
     # Initialize logger csv file
     init_csv_file()
 

@@ -253,6 +253,18 @@ function initialize() {
 
 }
 
+$(document).on('submit','#dog-bark-form',function(e)
+              {
+  console.log('submit dog bar');
+  e.preventDefault();
+  $.ajax({
+    type:'POST',
+    url:'/play_bark_sound',
+    data: $(this).serialize(),
+    sucess:function() { alert('saved')
+    }
+  })
+              })
 </script>
 
 
@@ -293,9 +305,36 @@ function initialize() {
 
     <div class="row">
       <p></p>
-      <h3>Latest Dog Bark Generated:</h3>
+      <h3>Latest Dog Bark Generator:</h3>
       <div id="log"> </div> <!-- /#log -->
   </div>
+  <div id="dog_bark_input">
+    <form action="/play_bark_sound" id="dog-bark-form" method="POST">
+      <p> 10 numbers from -1 to 1 to generate a bark sound. Press Submit to play</p>
+      <label for="fname">1:</label>
+      <input type="text" id="1" name="1"><br>
+      <label for="fname">2:</label>
+      <input type="text" id="2" name="2">  <br>   
+      <label for="fname">3:</label>
+      <input type="text" id="3" name="3">   <br>   
+      <label for="fname">4:</label>
+      <input type="text" id="4" name="4"> <br>     
+      <label for="fname">5:</label>
+      <input type="text" id="5" name="5">  <br>    
+      <label for="fname">6:</label>
+      <input type="text" id="6" name="6"> <br>     
+      <label for="fname">7:</label>
+      <input type="text" id="7" name="7"> <br>     
+      <label for="fname">8:</label>
+      <input type="text" id="8" name="8"><br>
+      <label for="fname">9:</label>
+      <input type="text" id="9" name="9"><br>
+      <label for="fname">10:</label>
+      <input type="text" id="10" name="10"><br>
+
+      <input type="Submit" value="Submit" class = "file_submit">
+    </form>
+    </div>
 </div>
 </body>
 </html>
