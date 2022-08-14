@@ -1,6 +1,6 @@
 # Dogtor AI
 ## Overview
-This Projects tries to provide a program that can detect a bark and the bark back using AI synthesided bark. 
+This Projects tries to provide a program that can detect a bark and the bark back using AI synthesized bark. 
 
 
 ## Downlaod DNN models folder
@@ -9,17 +9,17 @@ https://drive.google.com/drive/folders/1Cizpacxh4YzTHVSkSvmpXWVIK3nOJi7b?usp=sha
 and extract to the main directory under Dogtor-AI so the folder structure looks like:
 
 ### or 
-### Run command line in /Dorgot-AI/ folder to download the google doc
+### Run command line in /Dogtor-AI/ folder to download the google file
 wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1WPv4F-Q_a8P_MtuTt0mpd5VRom1e4HIc' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1WPv4F-Q_a8P_MtuTt0mpd5VRom1e4HIc" -O DogZip.zip && rm -rf /tmp/cookies.txt
 
-unzip DogZip.zip
-sudo mv -v ./DogZip/* .
-sudo rm DogZip.zip
-rm DogZip -r
- 
+unzip DogZip.zip 
+mv -v ./DogZip/* .
+rm -r DogZip*
+
  At the end the structure should look like this of files downloaded from drive:
 - Dogtor-AI
     - models
+    - audio_files
 
 
 ## Setup
@@ -28,7 +28,8 @@ Install libraries in requirements.txt. Use of a virtual env is suggested. On Lin
 
 python3 -m venv dogtor-ai-venv
 source dogtor-ai-venv/bin/activate
-pip install -r requirements.txt
+pip3 install --upgrade pip
+pip3 install -r requirements.txt
 
 
 ## Usage
@@ -46,7 +47,7 @@ Audio is captured and concatonated with .12 seconds of audio from previous recor
 ![Untitled Diagram drawio](https://user-images.githubusercontent.com/85537933/181687285-7e8fcf16-184e-4234-b384-18006418ef5a.png)
 
 ### 3. Image Classifier
-![Image_classfier_model drawio](https://user-images.githubusercontent.com/85537933/181688253-36f4db77-0b63-40dc-b6e2-79474a9f96d7.png)
+![Image_classfier_model drawio (1)](https://user-images.githubusercontent.com/85537933/183232724-e670f99f-c1dc-46ee-a2be-82e96a946dea.png)
 
 ### 4. VAE neural network architecture coded following 'The Sound of AI' Youtube tutorial series by Valerio Velardo but modified for multiple TF modles loaded at the same time
 
