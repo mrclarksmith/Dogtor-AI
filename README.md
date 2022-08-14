@@ -1,6 +1,6 @@
 # Dogtor AI
 ## Overview
-This Projects tries to provide a program that can detect a bark and the bark back using AI synthesided bark. 
+This Projects tries to provide a program that can detect a bark and the bark back using AI synthesized bark. 
 
 
 ## Downlaod DNN models folder
@@ -9,17 +9,17 @@ https://drive.google.com/drive/folders/1Cizpacxh4YzTHVSkSvmpXWVIK3nOJi7b?usp=sha
 and extract to the main directory under Dogtor-AI so the folder structure looks like:
 
 ### or 
-### Run command line in /Dorgot-AI/ folder to download the google doc
+### Run command line in /Dogtor-AI/ folder to download the google file
 wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1WPv4F-Q_a8P_MtuTt0mpd5VRom1e4HIc' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1WPv4F-Q_a8P_MtuTt0mpd5VRom1e4HIc" -O DogZip.zip && rm -rf /tmp/cookies.txt
 
-unzip DogZip.zip
-sudo mv -v ./DogZip/* .
-sudo rm DogZip.zip
-rm DogZip -r
- 
+unzip DogZip.zip 
+mv -v ./DogZip/* .
+rm -r DogZip*
+
  At the end the structure should look like this of files downloaded from drive:
 - Dogtor-AI
     - models
+    - audio_files
 
 
 ## Setup
@@ -28,7 +28,8 @@ Install libraries in requirements.txt. Use of a virtual env is suggested. On Lin
 
 python3 -m venv dogtor-ai-venv
 source dogtor-ai-venv/bin/activate
-pip install -r requirements.txt
+pip3 install --upgrade pip
+pip3 install -r requirements.txt
 
 
 ## Usage
