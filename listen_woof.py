@@ -9,10 +9,6 @@ Program to bark back at those loud dogs
 
 from flask_socketio import SocketIO, emit
 
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-import matplotlib.pyplot as plt
-
-from PIL import Image
 import argparse
 import os
 import queue
@@ -25,24 +21,16 @@ from threading import Thread, Event
 from pathlib import Path
 import tensorflow as tf
 import time
-import librosa.display
 # from multiprocessing import Process
 # from multiprocessing import Queue
 # importing custom python module
 from check_woof import predict
 
 
-from flask import Flask, render_template, url_for, request, redirect, make_response, Response, send_file, jsonify, send_from_directory
+from flask import Flask, render_template, request, send_from_directory
 import json
-import random
 
-import base64
-from io import BytesIO
-from flask import Flask, render_template
-from PIL import Image
-import io
 import csv
-import pandas as pd
 
 print("[CURRENT WORKING DIRECTORY] ", os.getcwd())
 
@@ -206,7 +194,6 @@ def generate_point_audio(lite_model_vae_decoder,  lite_model_gan, encoding, save
     # Generate audio_predict
     audio_generated = run_lite_model(np.squeeze(mel_set)[np.newaxis, ...], lite_model_gan)
     print("playing audio generated bark")
-    print(audio_generated)
     sd.play(np.squeeze(audio_generated), samplerate=RATE)
     sd.wait()
     # save audio
@@ -292,7 +279,6 @@ def save_generated_bark(data, name):
     path_s.mkdir(parents=True, exist_ok=True)
     path = name+".wav"
     max_16bit = 2**15
-    # print("dir made")
     data = data * max_16bit
     data = data.astype(np.int16)
     with wave.open('./audiosave/'+now+path, mode='w') as wb:
@@ -317,8 +303,10 @@ def save_audio(data, name):
 
 def thread_play_woof(generate):
     global woof_count
+    global prevent_bark_flag
+    prevent_bark_flag = True
     print("dog was heard")
-    woof_count += 1
+    woof_count += 1  # This keeps track of how many barks were heard before a bark was played to minimize excessive barking
 
     if (woof_count == WOOF_ACTIVATION_PLAYBACK_COUNT) & (PLAYBACK == True):
         if generate == True:
@@ -338,9 +326,6 @@ def thread_play_woof(generate):
 # NOTE: that variable woof = 0 is needed to set woof prediction to false, this is so that you can disable playback of dog bark if too many barks happend
 
 
-tok_tok = 0
-
-
 def callback(indata, frames, _, status, woof=False):
     global woof_count
     global save_buff
@@ -348,11 +333,13 @@ def callback(indata, frames, _, status, woof=False):
     global p
     global flag_save
     global plot_url_q
-    global tok_tok
+    global prevent_bark_flag
+
     if status:
         print(status, "status")
     if any(indata):
         if all(save_buff) is None:
+            # Start Filling the Que and buffer at program start
             save_buff = np.squeeze(indata)
             print("init_concat", frames)
         else:
@@ -371,10 +358,8 @@ def callback(indata, frames, _, status, woof=False):
             if put_in_queue == True:
                 p.put(np.squeeze(indata))
 
-            # only triggers Tensorflow if there is loud bark / audio
+            # only triggers Tensorflow if there is loud bark / audio to save power
             indata_loudness = round(max(np.abs(indata))[0], 4)
-            print(time.time()-tok_tok)
-            tok_tok = time.time()
             if indata_loudness < loud_threshold:
                 print("inside silence reign:", "Listening to buffer",
                       frames, "samples", "Loudness:", indata_loudness)
@@ -382,28 +367,33 @@ def callback(indata, frames, _, status, woof=False):
                     plot_url_q.put([np.zeros((77, 96)), 0])
 
             else:
-                # woof get sets to "True" if woof is heard
+                # woof get sets to "True" if woof is heard based on the confidence criteria
                 woof, prediction, data = predict(
                     buff[np.newaxis, :], interpreter, confidence=CONFIDENCE, additional_data=True)
                 print("Predictions: score:", prediction, "Loudness:",
                       indata_loudness, "/", loud_threshold)
-
-                print(WEB_FLASK, "FLASK WEB")
-                if WEB_FLASK == 1:
+                if prevent_bark_flag:
+                    # prevents false actions from microphone picked up barks from the program
+                    woof = False
+                if WEB_FLASK == 1:  # TODO put this as passable argument to the progrm
                     # put "data" from prediction in que trimmed for current frame of audio
                     # data is sliced to cut Extra buffer data to make the audio seamless
                     plot_url_q.put([data.T[:77], woof])
                 if (woof) and (SAVEAUDIO is True) and (flag_save == True):
+                    # saves audio of the dog bark heard to "audiosave folder
                     put_in_queue = True
                     flag_save = False
                     save_thread = Thread(target=save_audio, args=(
                         save_buff, f"_P{round(prediction,4)}L{max(np.abs(indata))}"))
                     save_thread.start()
-                if woof:
+                if (woof):
                     # arg:generate = True #TODO this needs to be coded into the args
                     th_w = Thread(target=thread_play_woof, args=[True])
                     th_w.start()
+                    # saves date and time of dog barks and if audio of the bark was saved
                     write_to_csv(1, int(SAVEAUDIO))
+                else:
+                    prevent_bark_flag = False
     else:
         print('no input')
 
@@ -445,7 +435,7 @@ if __name__ == "__main__":
     BUFFER_ADD = .226  # Seconds to add to the buffer from previous buffer for prediction, cannot exceed 2 seconds combined with BUFFER_SECONDS
     CHANNELS = 1  # Number of audio channels (left/Right/Mono) #not configurable
     AUDIO_DIR = './audio_files/'  # Directory where the barking sounds are to be played back
-    CONFIDENCE = .75  # Confidence of the prediciton model for identifying if the sound contains dog bark
+    CONFIDENCE = .985  # Confidence of the prediciton model for identifying if the sound contains dog bark
     RATE = 22050  # Samples per second : Setting custom rate to 22050 instead of 44100 to save on computational time #Rate of the microphone is overwritten later. Big dudu will happend if changed and you will not even know
     REC_AFTER = 2  # NUmber x Buffer_seconds to record after the event has occured
     BARK_ENCODING = np.array([[-3.0, -1.6774293,  0.5526688,  7.012168, -2.2925243,
@@ -464,6 +454,8 @@ if __name__ == "__main__":
     save_name = 0  # Used for saving waves files # Not sued currently
     save_buff = np.array([])
     woof_count = 0  # Initialize count for dog barks
+    # This is used to disable bark detection or playback when program played back the bark sound to prevent continius loop
+    prevent_bark_flag = False
     p = queue.Queue(1)
     data_que = queue.Queue(5)
     plot_url_q = queue.Queue(3)  # que flask server to send to website

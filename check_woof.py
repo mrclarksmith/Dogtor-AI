@@ -5,17 +5,17 @@ Created on Thu Oct 28 12:02:53 2021
 """
 import librosa
 import numpy as np
-import time #used for checking timing only
+import time  # used for checking timing only
 
 SR = 22050
 N_FFT = 512
-N_MELS = 96 # Height of the PICTURE (data points per time frame)
+N_MELS = 96  # Height of the PICTURE (data points per time frame)
 WINDOW_TYPE = 'hann'
 FEATURE = 'mel'
 HOP_LENGTH = N_FFT//2
 FRAME_LENGTH = 97  # Maximum frames that TF model can take can take (Frames=time Frames)
 FMIN = 200
-PAD = 20 # Pad Length in the beggining if ther is more than 20 frames to pasd
+PAD = 20  # Pad Length in the beggining if ther is more than 20 frames to pasd
 
 
 def normalize(x):
@@ -72,7 +72,7 @@ def pad_data(data):
         data = np.pad(
             data, ((0, 0), (0, FRAME_LENGTH-data.shape[1])), 'constant', constant_values=(0))
     elif data.shape[1] > FRAME_LENGTH:
-        data = data[:,:FRAME_LENGTH]
+        data = data[:, :FRAME_LENGTH]
     return data
 
 
@@ -100,7 +100,7 @@ def predict(audio_buffer, interpreter, confidence=.93, wav=False, sr=22050, addi
         predictions = [[0]]
     prediction = round(predictions[0][0], 4)
 
-    # Returns, 1/0 prediction score, the MEL spectrogram used for prediction
+    # Returns, True false prediction score, the MEL spectrogram used for prediction
     if additional_data == True:
         if (prediction > confidence):  # TF predicts in batches must specify we want first input of the multi input batch
             return True, prediction, data  # Returns Unpadded Data
