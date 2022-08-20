@@ -22,6 +22,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+log_data/dog_log.csv
 models/
 parts/
 sdist/

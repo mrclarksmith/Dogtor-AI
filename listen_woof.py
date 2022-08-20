@@ -435,7 +435,7 @@ if __name__ == "__main__":
     BUFFER_ADD = .226  # Seconds to add to the buffer from previous buffer for prediction, cannot exceed 2 seconds combined with BUFFER_SECONDS
     CHANNELS = 1  # Number of audio channels (left/Right/Mono) #not configurable
     AUDIO_DIR = './audio_files/'  # Directory where the barking sounds are to be played back
-    CONFIDENCE = .985  # Confidence of the prediciton model for identifying if the sound contains dog bark
+    CONFIDENCE = .50  # Confidence of the prediciton model for identifying if the sound contains dog bark
     RATE = 22050  # Samples per second : Setting custom rate to 22050 instead of 44100 to save on computational time #Rate of the microphone is overwritten later. Big dudu will happend if changed and you will not even know
     REC_AFTER = 2  # NUmber x Buffer_seconds to record after the event has occured
     BARK_ENCODING = np.array([[-3.0, -1.6774293,  0.5526688,  7.012168, -2.2925243,

@@ -7,7 +7,7 @@ Needed for DogPI
 """
 
 
-#from sklearn.metrics import accuracy_score, precision_score, recall_score
+# from sklearn.metrics import accuracy_score, precision_score, recall_score
 
 
 import _audio_helper as ah  # custom library ah=AudioHelper
@@ -22,6 +22,8 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 import tensorflow_hub as hub
 import time
+import math
+import tensorflow_addons as tfa
 tf.random.set_seed(42)
 
 
@@ -35,8 +37,10 @@ HOP_LENGTH = N_FFT//2
 # Defining hyperparameters
 DESIRED_SAMPLES = FRAME_LENGTH*HOP_LENGTH  # 24,832 samples
 
-BATCH_SIZE = 8
 
+BATCH_SIZE = 64
+STEPS_PER_EPOCH = 8
+EPOCHS = 100
 # makes sure not to delete this folder :)
 model_path = os.path.join("D:/python2/woof_friend/bit_m-r101x1_1")
 module = hub.KerasLayer(model_path)
@@ -46,7 +50,7 @@ module = hub.KerasLayer(model_path)
 class New_model(tf.keras.Model):
     def __init__(self, module, frame_height, frame_length):
         super().__init__()
-        self.pre2d = tf.keras.layers.Conv2D(3, (3, 3), padding="same", name='pre2d')
+        #self.pre2d = tf.keras.layers.Conv2D(3, (3, 3), padding="same", name='pre2d')
         self.dense1 = tf.keras.layers.Dense(512, activation='relu', name='dense1')
         self.dense2 = tf.keras.layers.Dense(256, activation='relu', name='dense2')
         self.head = tf.keras.layers.Dense(1, activation='sigmoid')
@@ -55,8 +59,9 @@ class New_model(tf.keras.Model):
         self.bit_model = module
 
     def call(self, images):
-        #pre2d = tf.keras.layers.concatenate([images, images, images], axis=3, name="pre2d_conc")
-        pre2d = self.pre2d(images)
+        pre2d = tf.keras.layers.concatenate(
+            [images, images, images], axis=3, name="pre2d_conc")  # repalces pre2d
+        #pre2d = self.pre2d(images)
         bit_model = self.bit_model(pre2d)
         bit_embedding = self.dense1(bit_model)
         bit_embedding = self.dense2(bit_embedding)
@@ -66,14 +71,6 @@ class New_model(tf.keras.Model):
         inputs = tf.keras.layers.Input(shape=(self.frame_height, self.frame_length, 1))
         outputs = self.call(inputs)
         return tf.keras.Model(inputs=inputs, outputs=outputs, name="model")
-
-    # def train_step(self, batch):
-    #     x_batch_train, y_batch_train = batch
-    #     with tf.GradientTape() as tape:
-    #         logits = self.model(x_batch_train, training=True)
-    #         loss_value = loss_fn(y_batch_train)
-
-# Needed to use parallel processing of a class
 
 
 class bit_trainer:
@@ -109,12 +106,11 @@ class bit_trainer:
         self.data = pd.concat([dog_pd, not_dog_pd], ignore_index=True)
         X_train, X_test, y_train, y_test = self.split_data(self.data.X, self.data.y, test_size=.18)
 
-        #self.X_train_list = X_train.tolist()
+        self.X_train_list = X_train.tolist()
         self.data_train = list(zip(X_train, y_train))
+        self.y_train = y_train.tolist()
 
-        #self.X_train = np.array(X_train.tolist())[...,  np.newaxis]
         self.X_test = np.array(X_test.tolist())[...,  np.newaxis]
-        #self.y_train = np.array(y_train.tolist())[...,  np.newaxis]
         self.y_test = np.array(y_test.tolist())[...,  np.newaxis]
 
         self.compile_model()
@@ -149,21 +145,27 @@ class bit_trainer:
 
         self.model_checkpoint_callback = model_checkpoint_callback
 
+    def ini_data_train_set(self):
+        # Data set creation
+        dataset = tf.data.Dataset.from_tensor_slices((self.X_train_list, self.y_train))
+
+        dataset = dataset.shuffle(len(self.X_train_list))
+
+        dataset = dataset.map(self.prepross_epoch_tf)
+        dataset = dataset.batch(self.batch_size)
+        self.dataset = dataset.repeat(self.epochs)
+
+ # <train>
     def train(self):
-        for epoch in range(self.epochs):
-            print(epoch, " out of ", self.epochs)
-            X_train_agmented, y_train = self.prepross_epoch(
-                self.data_train)  # Squeeze not needed in this code
-            X_train_agmented = np.array(X_train_agmented)[...,  np.newaxis]
-            y_train = np.array(y_train)[...,  np.newaxis]
-            # add scheduler for learning rate as it resets each epoch with model.fit function
-            self.model.fit(X_train_agmented, y_train,
-                           batch_size=self.batch_size,
-                           steps_per_epoch=self.steps_per_epoch,
-                           epochs=3,
-                           validation_data=[self.X_test, self.y_test],
-                           callbacks=[self.model_checkpoint_callback],
-                           )
+        # dataset = dataset.prefetch(1)
+
+        # add scheduler for learning rate as it resets each epoch with model.fit function
+        self.history = self.model.fit(self.dataset,
+                                      epochs=self.epochs,
+                                      steps_per_epoch=self.steps_per_epoch,
+                                      validation_data=[self.X_test, self.y_test],
+                                      callbacks=[self.model_checkpoint_callback],
+                                      )
 
     def load_check(self, callback_save_dir):
         self.callback_save_dir = callback_save_dir
@@ -172,17 +174,13 @@ class bit_trainer:
 
     @staticmethod
     def _normalize(x, a=0, b=1):
-        x = ((b-a)*(x - x.min()) / (x.max() - x.min())) + (a)
+        x = ((b-a)*(x - x.min()) / (x.max() - x.min()+1e-7)) + (a)
         return x
 
     @staticmethod
     def _power_to_db(S):
         S_DB = librosa.power_to_db(S, ref=np.max)
         return S_DB
-
-
-# randomly pad data in the front
-
 
     @staticmethod
     def _data_pad_random(item, frame_length):
@@ -213,16 +211,30 @@ class bit_trainer:
             return item
         return item
 
+# randomly pad data in the front
+    @staticmethod
+    def _data_pad_tf(item, frame_length, frame_height):
+        if tf.shape(item)[1] > frame_length:
+            item = tf.slice(item, begin=[0, 0], size=[frame_height, frame_length])
+        elif tf.shape(item)[1] < frame_length:
+            item = tf.pad(item, [[0, 0], [0, frame_length-tf.shape(item)[1]]])
+        return item
+
     def preprocess(self, filename, desired_samples=DESIRED_SAMPLES, load=True):
         frame_height = self.frame_height  # NUMBER OF MELS
         FMIN = 200
         if load:
             audio, _ = librosa.load(filename, res_type='kaiser_fast', sr=sr, mono=True)
             audio = np.trim_zeros(audio)
-            audio = audio[:desired_samples]
+            if len(audio) > desired_samples:
+                # desired samples need to be divisible by 2
+                audio = audio[len(audio)//2-desired_samples//2:len(audio)//2+desired_samples//2]
+            else:
+                pad = (desired_samples - len(audio))
+                audio = np.pad(audio, (pad//2, pad-pad//2), 'constant')
+
         else:
             audio = filename
-
         mel = librosa.feature.melspectrogram(audio, sr,
                                              n_fft=N_FFT,
                                              hop_length=HOP_LENGTH,
@@ -242,32 +254,77 @@ class bit_trainer:
     def remove_leading_trailing_zeros(t):
         p = np.where(t != 0)
         t = t[:, min(p[1]): max(p[1]) + 1]
-        #t = t[min(p[0]): max(p[0]) + 1, min(p[1]): max(p[1]) + 1]
+        # t = t[min(p[0]): max(p[0]) + 1, min(p[1]): max(p[1]) + 1]
         return t
 
-    # This step happens on each epoch
-    def prepross_epoch(self, mels):
-        new_mels = []
-        y_train = []
-        for train_data_point in mels:
-            mel = train_data_point[0]
-            y = train_data_point[1]
-            mel = self.remove_leading_trailing_zeros(mel)
-            # Randomly concatonate 2 different barks
-            if (random.random() < .5) & (mel.shape[1] < 80) & (y == 1):
-                mel_add = self.remove_leading_trailing_zeros(random.choice(self.dog_mel))
-                mel = np.concatenate((mel, mel_add), axis=1)
-            # Add random blockout blocks to obfuscate the data
+    @staticmethod
+    def remove_leading_trailing_zeros_tf(x):
+        intermediate_tensor = tf.math.reduce_sum(x, axis=0)
+        zero_vector = tf.zeros(shape=(1, 1), dtype=tf.float32)
+        bool_mask = tf.not_equal(intermediate_tensor, zero_vector)
+        bool_mask = tf.squeeze(bool_mask)
+        # bool_mask_2d = tf.repeat(bool_mask, repeats=tf.shape(x)[0], axis=0)
+        omit_zeros = tf.boolean_mask(x, bool_mask, axis=1)
+        return omit_zeros
 
-            mel = self._data_pad(mel, self.frame_length)
-            if random.random() < .7:
-                mel = self.block_horiz(mel)
-            if random.random() < .2:
-                # not sure if this helps due to nature of dog bark being a vertical activation of frequencies
-                mel = self.block_vert(mel)
-            new_mels.append(mel)
-            y_train.append(y)
-        return new_mels, y_train
+    # # This step happens on the whole data set if called
+    # def prepross_all_epoch(self, mels):
+    #     new_mels = []
+    #     y_train = []
+    #     for train_data_point in mels:
+    #         mel = train_data_point[0]
+    #         y = train_data_point[1]
+    #         mel = self.remove_leading_trailing_zeros(mel)
+    #         # Randomly concatonate 2 different barks
+    #         if (random.random() < .5) & (mel.shape[1] < 80) & (y == 1):
+    #             mel_add = self.remove_leading_trailing_zeros(random.choice(self.dog_mel))
+    #             mel = np.concatenate((mel, mel_add), axis=1)
+    #         # Add random blockout blocks to obfuscate the data
+
+    #         mel = self._data_pad(mel, self.frame_length)
+    #         if random.random() < .7:
+    #             mel = self.block_horiz(mel)
+    #         if random.random() < .2:
+    #             # not sure if this helps due to nature of dog bark being a vertical activation of frequencies
+    #             mel = self.block_vert(mel)
+    #         new_mels.append(mel)
+    #         y_train.append(y)
+    #     return new_mels, y_train
+# <>
+    def prepross_epoch_tf(self, mel, label):
+        mel = self.remove_leading_trailing_zeros_tf(mel)
+        # Randomly concatonate 2 different barks
+        if (random.random() < 1.5) & (tf.shape(mel)[0] < 80) & (label == 1):
+            mel_add = self.remove_leading_trailing_zeros_tf(
+                tf.convert_to_tensor(random.choice(self.dog_mel))
+            )
+            mel = tf.concat((mel, mel_add), axis=1)
+
+        mel_pad = self._data_pad_tf(mel, self.frame_length, self.frame_height)
+        # Add random blockout blocks to obfuscate the data
+        for i in range(int(random.random()*5)):
+            # Expanding dimensions to [NOne,Height,Width, Channels]
+            mel = tf.expand_dims(mel, -1)
+            mel = tf.expand_dims(mel, 0)
+            # Horizontal Bar
+            # mask needs to be divisible by 2 thats why its 96 here and 4
+            mel = tfa.image.random_cutout(mel, 4, 96, 0)
+            mel = tf.squeeze(mel)
+
+        for i in range(int(random.random()*4)):
+            # Expanding dimensions to [NOne,Height,Width, Channels]
+            mel = tf.expand_dims(mel, -1)
+            mel = tf.expand_dims(mel, 0)
+            # Vertial Bar of height 96
+            mel = tfa.image.random_cutout(mel, 96, 4, 0)
+            mel = tf.squeeze(mel)
+
+        # if random.random() < 1.2:
+        #     # not sure if this helps due to nature of dog bark being a vertical activation of frequencies
+        #     mel = self.block_vert(mel)
+
+        mel_pad = tf.expand_dims(mel_pad, 2)
+        return mel_pad, label
 
     def process_data(self, mylist):
         results = []  # Mel frequency
@@ -309,7 +366,7 @@ class bit_trainer:
 
     @staticmethod
     def normalize(x, a=0, b=1):
-        y = ((b-a)*(x - x.min()) / (x.max() - x.min())) + (a)
+        y = ((b-a)*(x - x.min()) / (x.max() - x.min()+1e-7)) + (a)
         return y
 
     def plot_mel(self, S):
@@ -369,6 +426,52 @@ class bit_trainer:
             f.write(tflite_model)
         print("saved as woof_friend_final.tflite")
 
+
+# class CustomDataGen(tf.keras.utils.Sequence):
+
+#     def __init__(self, x_set, y_set, batch_size):
+#         self.x, self.y = x_set, y_set
+#         self.batch_size = batch_size
+#         self.on_epoch_end()
+
+#     def __getitem__(self, idx):
+#         batch_x = self.x[idx * self.batch_size:(idx + 1) * self.batch_size]
+#         batch_y = self.y[idx * self.batch_size:(idx + 1) * self.batch_size]
+#         new_mels = []
+#         y_train = []
+#         for mel, y in zip(batch_x, batch_y):
+#             mel = self.remove_leading_trailing_zeros(mel)
+#             # Randomly concatonate 2 different barks
+#             if (random.random() < .5) & (mel.shape[1] < 80) & (y == 1):
+#                 mel_add = self.remove_leading_trailing_zeros(
+#                     random.choice(self.dog_mel))
+#                 mel = np.concatenate((mel, mel_add), axis=1)
+#             # Add random blockout blocks to obfuscate the data
+
+#             mel = self._data_pad(mel, self.frame_length)
+#             if random.random() < .7:
+#                 mel = self.block_horiz(mel)
+#             if random.random() < .2:
+#                 # not sure if this helps due to nature of dog bark being a vertical activation of frequencies
+#                 mel = self.block_vert(mel)
+#             new_mels.append(mel)
+#             y_train.append(y)
+#             print("_getitem__", idx)
+
+#         return np.array(new_mels)[...,  np.newaxis], np.array(y_train)[...,  np.newaxis]
+
+#     def __len__(self):
+#         return math.ceil(len(self.x) / self.batch_size)
+
+
+#     @staticmethod
+#     def remove_leading_trailing_zeros(t):
+#         p = np.where(t != 0)
+#         t = t[:, min(p[1]): max(p[1]) + 1]
+#         #t = t[min(p[0]): max(p[0]) + 1, min(p[1]): max(p[1]) + 1]
+#         return t
+
+
 ###################################################################################################
 
 
@@ -384,16 +487,8 @@ not_dog_dir = "D:/python2/woof_friend/Dogtor-AI/ML/data/ML_SET/not_dog"
 
 model = New_model(module=module, frame_height=FRAME_HEIGHT, frame_length=FRAME_LENGTH)
 
-SCHEDULE_LENGTH = 25
-SCHEDULE_BOUNDARIES = [200, 300, 400, 500]
-# SCHEDULE_LENGTH = SCHEDULE_LENGTH * 512 / BATCH_SIZE
-BATCH_SIZE = 64
-lr = 0.003 * BATCH_SIZE / 512
-STEPS_PER_EPOCH = 8
-EPOCHS = 22
 
-
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005,)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0004,)
 loss_fn = tf.keras.losses.BinaryCrossentropy()
 
 bit_model = bit_trainer(model, dog_dir, not_dog_dir, FRAME_LENGTH,
@@ -406,6 +501,7 @@ bit_model.optimizer = optimizer
 
 
 bit_model.initialize_data()
+bit_model.ini_data_train_set()
 bit_model.checkpoint_data()
 
 bit_model.train()
